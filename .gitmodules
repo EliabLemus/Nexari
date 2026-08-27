@@ -1,0 +1,4 @@
+[submodule "runtime/vivari"]
+	path = runtime/vivari
+	url = https://github.com/maitrungduc1410/vivari.git
+	branch = master

@@ -1,0 +1,33 @@
+name: Nexari CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  contract-and-provenance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node --version
+      - run: npm run typecheck
+      - run: npm run generate:compatibility
+      - run: npm test
+      - run: git diff --exit-code -- compatibility
+
+  runtime-toolchain-readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: rustc --version
+      - run: node --version
+      - run: git -C runtime/vivari rev-parse HEAD
+      - run: test -f runtime/vivari/LICENSE

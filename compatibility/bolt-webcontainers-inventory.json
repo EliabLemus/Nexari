@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-27T17:04:55Z",
+  "source": {
+    "repository": "https://github.com/stackblitz-labs/bolt.diy",
+    "commit": "2e254ac19a696394030601bc602f54945b12bfc4",
+    "access": "read-only local analysis clone"
+  },
+  "requirements": [
+    {
+      "id": "BOLT-WC-001",
+      "priority": "must-have",
+      "category": "boot",
+      "statement": "WebContainer.boot accepts coep credentialless, workdirName and forwardPreviewErrors.",
+      "bolt_source": "app/lib/webcontainer/index.ts:26-30",
+      "proof": "e2e/boot-options.spec.ts",
+      "nexari_status": "unknown"
+    },
+    {
+      "id": "BOLT-WC-002",
+      "priority": "must-have",
+      "category": "preview-diagnostics",
+      "statement": "Runtime accepts preview script injection and emits preview diagnostics to the host.",
+      "bolt_source": "app/lib/webcontainer/index.ts:37-57",
+      "proof": "e2e/preview-diagnostics.spec.ts",
+      "nexari_status": "unknown"
+    },
+    {
+      "id": "BOLT-WC-003",
+      "priority": "must-have",
+      "category": "filesystem",
+      "statement": "Filesystem supports readFile, writeFile, mkdir, readdir and rm with text and binary payloads.",
+      "bolt_source": "app/lib/stores/files.ts:554-888; app/lib/hooks/useGit.ts:191-311",
+      "proof": "e2e/filesystem-crud.spec.ts",
+      "nexari_status": "unknown"
+    },
+    {
+      "id": "BOLT-WC-004",
+      "priority": "must-have",
+      "category": "workdir",
+      "statement": "Runtime exposes a stable workdir used for path translation by actions, persistence and git.",
+      "bolt_source": "app/lib/runtime/action-runner.ts:317-466; app/lib/hooks/useGit.ts:87-138",
+      "proof": "e2e/workdir.spec.ts",
+      "nexari_status": "unknown"
+    },
+    {
+      "id": "BOLT-WC-005",
+      "priority": "must-have",
+      "category": "spawn",
+      "statement": "Runtime spawns node, npm and shell-like guest processes with arguments, cwd/env and observable exit.",
+      "bolt_source": "app/lib/runtime/action-runner.ts:395; app/utils/shell.ts:7-89",
+      "proof": "e2e/process-spawn.spec.ts",
+      "nexari_status": "unknown"
+    },
+    {
+      "id": "BOLT-WC-006",
+      "priority": "must-have",
+      "category": "terminal",
+      "statement": "Interactive shell process exposes input, merged output, terminal cols/rows, resize and kill.",
+      "bolt_source": "app/utils/shell.ts:11-87; app/lib/stores/terminal.ts:50-61",
+      "proof": "e2e/interactive-terminal.spec.ts",
+      "nexari_status": "unknown"
+    },
+    {
+      "id": "BOLT-WC-007",
+      "priority": "must-have",
+      "category": "preview-events",
+      "statement": "Runtime emits raw port state and server-ready only after a usable preview response.",
+      "bolt_source": "app/lib/stores/previews.ts:169-208",
+      "proof": "e2e/preview-readiness.spec.ts",
+      "nexari_status": "unknown"
+    },
+    {
+      "id": "BOLT-WC-008",
+      "priority": "must-have",
+      "category": "preview-routing",
+      "statement": "Host can attach a preview and cleanly detach stale routes on teardown.",
+      "bolt_source": "app/components/workbench/Preview.tsx:380-399; app/lib/stores/previews.ts:211-254",
+      "proof": "e2e/preview-lifecycle.spec.ts",
+      "nexari_status": "unknown"
+    },
+    {
+      "id": "BOLT-WC-009",
+      "priority": "must-have",
+      "category": "watching",
+      "statement": "Runtime exposes a path-watch capability suitable for host file synchronisation.",
+      "bolt_source": "app/lib/stores/files.ts:593-605",
+      "proof": "e2e/filesystem-watch.spec.ts",
+      "nexari_status": "unknown"
+    },
+    {
+      "id": "BOLT-WC-010",
+      "priority": "should-have",
+      "category": "search",
+      "statement": "Runtime supports host-scoped text search or reports it unsupported explicitly.",
+      "bolt_source": "app/components/workbench/Search.tsx:17-23,129",
+      "proof": "e2e/text-search-capability.spec.ts",
+      "nexari_status": "unknown"
+    },
+    {
+      "id": "BOLT-WC-011",
+      "priority": "must-have",
+      "category": "export",
+      "statement": "Runtime can recursively enumerate project files for Git and deployment flows.",
+      "bolt_source": "app/components/deploy/GitHubDeploy.client.tsx:86-149; app/components/deploy/NetlifyDeploy.client.tsx:84-149",
+      "proof": "e2e/project-export.spec.ts",
+      "nexari_status": "unknown"
+    },
+    {
+      "id": "BOLT-WC-012",
+      "priority": "must-have",
+      "category": "native-limits",
+      "statement": "Native binaries, permission changes and symlinks are disclosed rather than implied.",
+      "bolt_source": "app/lib/hooks/useGit.ts:358-374; app/lib/common/prompts/prompts.ts:18-41",
+      "proof": "e2e/unsupported-capabilities.spec.ts",
+      "nexari_status": "unknown"
+    },
+    {
+      "id": "BOLT-WC-013",
+      "priority": "must-have",
+      "category": "preview-url",
+      "statement": "Preview URL is host-configurable and not assumed to use StackBlitz wildcard domains.",
+      "bolt_source": "app/routes/webcontainer.preview.$id.tsx:66-88; app/components/workbench/Preview.tsx:380-399",
+      "proof": "e2e/self-hosted-preview-url.spec.ts",
+      "nexari_status": "unknown"
+    },
+    {
+      "id": "BOLT-WC-014",
+      "priority": "must-have",
+      "category": "isolation",
+      "statement": "Missing required isolation must fail closed before a guest process launches.",
+      "bolt_source": "Nexari requirement derived from public Vivari baseline and browser platform constraint",
+      "proof": "e2e/isolation-negative.spec.ts",
+      "nexari_status": "unknown"
+    },
+    {
+      "id": "BOLT-WC-015",
+      "priority": "must-have",
+      "category": "cancellation",
+      "statement": "A package-manager process must expose kill/cancellation and terminal recovery after a stalled command.",
+      "bolt_source": "Bolt issue #2043; app/lib/stores/terminal.ts:50-61",
+      "proof": "e2e/process-cancellation.spec.ts",
+      "nexari_status": "unknown"
+    },
+    {
+      "id": "BOLT-WC-016",
+      "priority": "must-have",
+      "category": "preview-recovery",
+      "statement": "Preview state must reflect a fresh server response and cleanly recover from stale routes.",
+      "bolt_source": "Bolt issue #2140; app/lib/stores/previews.ts:169-208",
+      "proof": "e2e/preview-recovery.spec.ts",
+      "nexari_status": "unknown"
+    },
+    {
+      "id": "BOLT-WC-017",
+      "priority": "must-have",
+      "category": "browser-support",
+      "statement": "Unsupported browser isolation states must be detectable and give a typed failure, not a blank preview.",
+      "bolt_source": "Bolt issue #2070; app/lib/webcontainer/index.ts:21-30",
+      "proof": "e2e/browser-capability-negative.spec.ts",
+      "nexari_status": "unknown"
+    }
+  ]
+}

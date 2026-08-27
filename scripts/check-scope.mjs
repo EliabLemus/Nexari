@@ -1,0 +1,11 @@
+import { readFile, readdir } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const notice = await readFile(path.join(root, 'THIRD_PARTY_NOTICES.md'), 'utf8');
+if (!notice.includes('9a89ff328b87ad0fb6a180d4401ea418c180cbe7') || !notice.includes('MIT')) throw new Error('Vivari provenance missing');
+if (!notice.includes('2e254ac19a696394030601bc602f54945b12bfc4')) throw new Error('Bolt read-only revision missing');
+const forbidden = ['bolt.diy', 'webcontainer-api'];
+const top = await readdir(root);
+for (const name of forbidden) if (top.includes(name)) throw new Error(`forbidden vendored path: ${name}`);
+console.log('Scope OK (isolated Nexari project; no vendored Bolt or StackBlitz package)');

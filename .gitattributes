@@ -1,0 +1,2 @@
+# Public source snapshots are retained byte-for-byte for their recorded SHA-256.
+compatibility/sources/stackblitz-public/*.html whitespace=-trailing-space

@@ -1,0 +1,19 @@
+{
+  "name": "nexari",
+  "version": "0.1.0-dev",
+  "private": true,
+  "type": "module",
+  "description": "An isolated, self-hosted browser runtime forked from Vivari.",
+  "scripts": {
+    "generate:compatibility": "node scripts/generate-compatibility-research.mjs",
+    "check:openspec": "node scripts/check-openspec-layout.mjs",
+    "check:bolt-inventory": "node scripts/check-bolt-inventory.mjs",
+    "check:stackblitz-ledger": "node scripts/check-stackblitz-source-ledger.mjs",
+    "check:bolt-issues": "node scripts/check-bolt-issue-triage.mjs",
+    "check:scope": "node scripts/check-scope.mjs",
+    "test": "npm run check:openspec && npm run check:bolt-inventory && npm run check:stackblitz-ledger && npm run check:bolt-issues && npm run check:scope",
+    "typecheck": "node --check scripts/generate-compatibility-research.mjs && node --check scripts/check-openspec-layout.mjs && node --check scripts/check-bolt-inventory.mjs && node --check scripts/check-stackblitz-source-ledger.mjs && node --check scripts/check-bolt-issue-triage.mjs && node --check scripts/check-scope.mjs",
+    "build": "npm run typecheck && npm test"
+  },
+  "engines": { "node": ">=20" }
+}
