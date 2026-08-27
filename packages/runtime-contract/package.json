@@ -1,0 +1,7 @@
+{
+  "name": "@nexari/runtime-contract",
+  "version": "0.1.0-dev",
+  "private": true,
+  "type": "module",
+  "exports": "./dist/index.js"
+}
