@@ -24,7 +24,7 @@ async function main() {
   status.textContent = 'Booting pinned Vivari runtime…';
   const runtime = createVivariRuntime({ id: crypto.randomUUID(), loadSdk: loadPinnedVivariSdk });
   await runtime.boot();
-  const detachPreview = runtime.attachPreview(preview);
+  runtime.attachPreview(preview);
   await runtime.mount(project);
   runtime.on('server-ready', (port, url) => {
     preview.src = url;
@@ -38,7 +38,6 @@ async function main() {
   void (async () => { for await (const chunk of process.output) write(chunk); })();
   teardownButton.addEventListener('click', async () => {
     teardownButton.disabled = true;
-    detachPreview();
     await runtime.teardown();
     preview.removeAttribute('src');
     preview.hidden = true;
