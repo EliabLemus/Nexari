@@ -49,6 +49,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   #bootPromise: Promise<void> | undefined;
   #guestBootPromise: Promise<VivariLike> | undefined;
   #guestBootInFlight = false;
+  #bootAbortController: AbortController | undefined;
   #teardownPromise: Promise<void> | undefined;
   #isIsolated: () => boolean;
   #loadSdk: () => Promise<VivariSdk>;
@@ -79,10 +80,15 @@ class NexariVivariRuntime implements BrowserRuntime {
     }
     if (!this.#isIsolated()) throw new RuntimeError('ISOLATION_REQUIRED', 'Nexari requires cross-origin isolation and SharedArrayBuffer.');
     this.#lifecycle.beginBoot();
+    const abortController = new AbortController();
+    this.#bootAbortController = abortController;
+    const forwardAbort = () => abortController.abort(signal?.reason);
+    if (signal?.aborted) forwardAbort();
+    else signal?.addEventListener('abort', forwardAbort, { once: true });
     try {
       const sdk = await this.#loadSdk();
       if (this.state !== 'booting') throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while Vivari SDK was loading');
-      this.#guestBootPromise = sdk.boot({ signal });
+      this.#guestBootPromise = sdk.boot({ signal: abortController.signal });
       this.#guestBootInFlight = true;
       let instance: VivariLike;
       try {
@@ -97,7 +103,7 @@ class NexariVivariRuntime implements BrowserRuntime {
       this.#instance = instance;
       this.#lifecycle.markReady();
     } catch (cause) {
-      if (this.state === 'terminated') {
+      if (this.#isTornDown()) {
         if (cause instanceof RuntimeError && cause.code === 'TORN_DOWN') throw cause;
         throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while Vivari was booting');
       }
@@ -107,6 +113,9 @@ class NexariVivariRuntime implements BrowserRuntime {
       }
       if (cause instanceof RuntimeError) throw cause;
       throw new RuntimeError('BOOT_FAILED', cause instanceof Error ? cause.message : 'Vivari boot failed');
+    } finally {
+      signal?.removeEventListener('abort', forwardAbort);
+      if (this.#bootAbortController === abortController) this.#bootAbortController = undefined;
     }
   }
 
@@ -161,6 +170,7 @@ class NexariVivariRuntime implements BrowserRuntime {
 
   async #teardown(): Promise<void> {
     this.#lifecycle.beginTeardown();
+    this.#bootAbortController?.abort();
     if (this.#guestBootInFlight) await this.#bootPromise?.catch(() => undefined);
     let failure: unknown;
     const cleanUp = (operation: () => void | Promise<void>) => {

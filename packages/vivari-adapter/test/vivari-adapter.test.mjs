@@ -77,6 +77,28 @@ test('teardown unsubscribes runtime event listeners so stale server events canno
   assert.equal(received, 0);
 });
 
+test('teardown aborts a pending guest boot so lifecycle cleanup cannot hang', async () => {
+  let observedSignal;
+  const runtime = createVivariRuntime({
+    id: 'abort-pending-boot',
+    isIsolated: () => true,
+    loadSdk: async () => ({
+      boot: ({ signal }) => new Promise((_resolve, reject) => {
+        observedSignal = signal;
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      }),
+    }),
+  });
+  const boot = runtime.boot();
+  const bootFailure = assert.rejects(boot, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  await new Promise(setImmediate);
+  const teardown = runtime.teardown();
+  await teardown;
+  await bootFailure;
+  assert.equal(observedSignal.aborted, true);
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('teardown during a pending boot tears down the late guest instead of leaking it', async () => {
   const fake = fakeSdk();
   let resolveBoot;
