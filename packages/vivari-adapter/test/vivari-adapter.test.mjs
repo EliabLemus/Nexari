@@ -87,6 +87,33 @@ test('teardown during a pending boot tears down the late guest instead of leakin
   assert.equal(runtime.state, 'terminated');
 });
 
+test('teardown waits for asynchronous cleanup of a guest that boots late', async () => {
+  const fake = fakeSdk();
+  let resolveBoot;
+  let releaseGuestTeardown;
+  fake.instance.teardown = () => {
+    fake.calls.teardown++;
+    return new Promise((resolve) => { releaseGuestTeardown = resolve; });
+  };
+  const runtime = createVivariRuntime({
+    id: 'late-async-teardown',
+    isIsolated: () => true,
+    loadSdk: async () => ({ boot: () => new Promise((resolve) => { resolveBoot = resolve; }) }),
+  });
+  const boot = runtime.boot();
+  await new Promise(setImmediate);
+  let teardownSettled = false;
+  const teardown = runtime.teardown().then(() => { teardownSettled = true; });
+  resolveBoot(fake.instance);
+  await new Promise(setImmediate);
+  assert.equal(fake.calls.teardown, 1);
+  assert.equal(teardownSettled, false);
+  releaseGuestTeardown();
+  await teardown;
+  await assert.rejects(boot, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('teardown during a pending SDK load reports termination rather than the late loader failure', async () => {
   let rejectLoad;
   const runtime = createVivariRuntime({

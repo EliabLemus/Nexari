@@ -46,6 +46,9 @@ class NexariVivariRuntime implements BrowserRuntime {
   #instance: VivariLike | undefined;
   #detachPreview = new Set<() => void>();
   #detachEvents = new Set<() => void>();
+  #bootPromise: Promise<void> | undefined;
+  #guestBootPromise: Promise<VivariLike> | undefined;
+  #guestBootInFlight = false;
   #teardownPromise: Promise<void> | undefined;
   #isIsolated: () => boolean;
   #loadSdk: () => Promise<VivariSdk>;
@@ -65,12 +68,25 @@ class NexariVivariRuntime implements BrowserRuntime {
 
   get state() { return this.#lifecycle.state; }
 
-  async boot({ signal }: { signal?: AbortSignal } = {}): Promise<void> {
+  boot({ signal }: { signal?: AbortSignal } = {}): Promise<void> {
+    if (!this.#bootPromise) this.#bootPromise = this.#boot(signal);
+    return this.#bootPromise;
+  }
+
+  async #boot(signal?: AbortSignal): Promise<void> {
     if (!this.#isIsolated()) throw new RuntimeError('ISOLATION_REQUIRED', 'Nexari requires cross-origin isolation and SharedArrayBuffer.');
     this.#lifecycle.beginBoot();
     try {
       const sdk = await this.#loadSdk();
-      const instance = await sdk.boot({ signal });
+      if (this.state !== 'booting') throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while Vivari SDK was loading');
+      this.#guestBootPromise = sdk.boot({ signal });
+      this.#guestBootInFlight = true;
+      let instance: VivariLike;
+      try {
+        instance = await this.#guestBootPromise;
+      } finally {
+        this.#guestBootInFlight = false;
+      }
       if (this.state !== 'booting') {
         await instance.teardown();
         throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while Vivari was booting');
@@ -139,6 +155,7 @@ class NexariVivariRuntime implements BrowserRuntime {
 
   async #teardown(): Promise<void> {
     this.#lifecycle.beginTeardown();
+    if (this.#guestBootInFlight) await this.#bootPromise?.catch(() => undefined);
     let failure: unknown;
     const cleanUp = (operation: () => void | Promise<void>) => {
       try {
