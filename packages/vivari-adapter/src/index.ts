@@ -152,9 +152,9 @@ class NexariVivariRuntime implements BrowserRuntime {
     let active = true;
     const ownedDetach = () => {
       if (!active) return;
+      detach();
       active = false;
       this.#detachPreview.delete(ownedDetach);
-      detach();
     };
     this.#detachPreview.add(ownedDetach);
     return ownedDetach;

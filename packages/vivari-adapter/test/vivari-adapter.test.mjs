@@ -236,6 +236,25 @@ test('preview cleanup failure cannot strand the guest during teardown', async ()
   assert.equal(runtime.state, 'terminated');
 });
 
+test('a failed caller preview detach remains owned so teardown can retry it', async () => {
+  const fake = fakeSdk();
+  let detachAttempts = 0;
+  fake.instance.attachPreview = () => () => {
+    detachAttempts++;
+    if (detachAttempts === 1) throw new Error('temporary iframe cleanup failure');
+    fake.calls.detach++;
+  };
+  const runtime = createVivariRuntime({ id: 'retry-caller-preview-detach', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const detach = runtime.attachPreview({});
+  assert.throws(detach, /temporary iframe cleanup failure/);
+  await runtime.teardown();
+  assert.equal(detachAttempts, 2);
+  assert.equal(fake.calls.detach, 1);
+  assert.equal(fake.calls.teardown, 1);
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('concurrent teardown callers share one cleanup instead of rejecting the later caller', async () => {
   const fake = fakeSdk();
   let releaseTeardown;
