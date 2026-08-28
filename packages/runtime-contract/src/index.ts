@@ -36,7 +36,7 @@ export interface BrowserRuntime {
   boot(options?: { signal?: AbortSignal }): Promise<void>;
   mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void>;
   spawn(command: string, args?: string[], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess>;
-  attachPreview(iframe: HTMLIFrameElement): () => void;
+  attachPreview(iframe: HTMLIFrameElement): () => void | Promise<void>;
   on<E extends keyof RuntimeEventMap>(event: E, listener: (...args: RuntimeEventMap[E]) => void): () => void;
   export(path?: string): Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>;
   teardown(): Promise<void>;

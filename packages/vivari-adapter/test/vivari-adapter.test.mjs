@@ -236,6 +236,24 @@ test('preview cleanup failure cannot strand the guest during teardown', async ()
   assert.equal(runtime.state, 'terminated');
 });
 
+test('teardown waits for asynchronous preview detachment before terminating the guest', async () => {
+  const fake = fakeSdk();
+  let releasePreviewDetach;
+  fake.instance.attachPreview = () => () => new Promise((resolve) => { releasePreviewDetach = resolve; });
+  const runtime = createVivariRuntime({ id: 'async-preview-detach', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  runtime.attachPreview({});
+  let teardownSettled = false;
+  const teardown = runtime.teardown().then(() => { teardownSettled = true; });
+  await new Promise(setImmediate);
+  assert.equal(teardownSettled, false);
+  assert.equal(fake.calls.teardown, 0);
+  releasePreviewDetach();
+  await teardown;
+  assert.equal(fake.calls.teardown, 1);
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('a failed caller preview detach remains owned so teardown can retry it', async () => {
   const fake = fakeSdk();
   let detachAttempts = 0;

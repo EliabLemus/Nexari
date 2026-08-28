@@ -13,7 +13,7 @@ export interface VivariLike {
   fs: RuntimeFileSystem;
   mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void>;
   spawn(command: string, args?: string[], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess>;
-  attachPreview(iframe: HTMLIFrameElement): () => void;
+  attachPreview(iframe: HTMLIFrameElement): () => void | Promise<void>;
   on(event: 'server-ready', listener: (port: number, url: string) => void): () => void;
   export(path?: string): Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>;
   teardown(): void | Promise<void>;
@@ -44,7 +44,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   readonly fs: RuntimeFileSystem;
   #lifecycle = new RuntimeLifecycle();
   #instance: VivariLike | undefined;
-  #detachPreview = new Set<() => void>();
+  #detachPreview = new Set<() => void | Promise<void>>();
   #detachEvents = new Set<() => void>();
   #bootPromise: Promise<void> | undefined;
   #guestBootPromise: Promise<VivariLike> | undefined;
@@ -147,12 +147,18 @@ class NexariVivariRuntime implements BrowserRuntime {
     return this.#ready().spawn(command, args, options);
   }
 
-  attachPreview(iframe: HTMLIFrameElement): () => void {
+  attachPreview(iframe: HTMLIFrameElement): () => void | Promise<void> {
     const detach = this.#ready().attachPreview(iframe);
     let active = true;
-    const ownedDetach = () => {
+    const ownedDetach = (): void | Promise<void> => {
       if (!active) return;
-      detach();
+      const result = detach();
+      if (result instanceof Promise) {
+        return result.then(() => {
+          active = false;
+          this.#detachPreview.delete(ownedDetach);
+        });
+      }
       active = false;
       this.#detachPreview.delete(ownedDetach);
     };
