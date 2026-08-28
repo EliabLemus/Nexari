@@ -45,6 +45,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   #lifecycle = new RuntimeLifecycle();
   #instance: VivariLike | undefined;
   #detachPreview = new Set<() => void>();
+  #detachEvents = new Set<() => void>();
   #isIsolated: () => boolean;
   #loadSdk: () => Promise<VivariSdk>;
 
@@ -101,7 +102,16 @@ class NexariVivariRuntime implements BrowserRuntime {
 
   on<E extends keyof RuntimeEventMap>(event: E, listener: (...args: RuntimeEventMap[E]) => void): () => void {
     if (event !== 'server-ready') throw new RuntimeError('UNSUPPORTED_CAPABILITY', `Unsupported event ${String(event)}`);
-    return this.#ready().on('server-ready', listener as (port: number, url: string) => void);
+    const detach = this.#ready().on('server-ready', listener as (port: number, url: string) => void);
+    let active = true;
+    const ownedDetach = () => {
+      if (!active) return;
+      active = false;
+      this.#detachEvents.delete(ownedDetach);
+      detach();
+    };
+    this.#detachEvents.add(ownedDetach);
+    return ownedDetach;
   }
 
   async export(path?: string): Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }> {
@@ -112,6 +122,7 @@ class NexariVivariRuntime implements BrowserRuntime {
     if (this.state === 'terminated') return;
     this.#lifecycle.beginTeardown();
     for (const detach of [...this.#detachPreview]) detach();
+    for (const detach of [...this.#detachEvents]) detach();
     await this.#instance?.teardown();
     this.#lifecycle.markTerminated();
   }

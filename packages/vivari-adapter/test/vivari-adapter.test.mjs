@@ -7,13 +7,13 @@ import { createVivariRuntime } from '../dist/index.js';
 const stream = new ReadableStream({ start(controller) { controller.close(); } });
 
 function fakeSdk() {
-  const calls = { boot: 0, mount: 0, spawn: 0, teardown: 0, detach: 0 };
+  const calls = { boot: 0, mount: 0, spawn: 0, teardown: 0, detach: 0, unsubscribe: 0 };
   let serverReady;
   const instance = {
     fs: { readFile: async () => 'ok', writeFile: async () => {}, readdir: async () => [], mkdir: async () => {}, rm: async () => {} },
     mount: async () => { calls.mount++; },
     spawn: async () => { calls.spawn++; return { pid: 41, output: stream, stdout: stream, stderr: stream, input: new WritableStream(), exit: Promise.resolve(0), kill() {} }; },
-    on: (_event, listener) => { serverReady = listener; return () => { serverReady = undefined; }; },
+    on: (_event, listener) => { serverReady = listener; return () => { calls.unsubscribe++; serverReady = undefined; }; },
     emitServerReady: (...args) => serverReady?.(...args),
     attachPreview: () => () => { calls.detach++; },
     export: async () => ({ files: [], truncated: false }),
@@ -41,7 +41,7 @@ test('maps the owned fork and detaches previews on idempotent teardown', async (
   detach();
   await runtime.teardown();
   await runtime.teardown();
-  assert.deepEqual(fake.calls, { boot: 1, mount: 1, spawn: 1, teardown: 1, detach: 1 });
+  assert.deepEqual(fake.calls, { boot: 1, mount: 1, spawn: 1, teardown: 1, detach: 1, unsubscribe: 0 });
   assert.equal(runtime.state, 'terminated');
   await assert.rejects(runtime.spawn('node'), (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
 });
@@ -55,4 +55,16 @@ test('forwards server readiness as a typed runtime event', async () => {
   fake.instance.emitServerReady(3111, 'http://preview.test/');
   off();
   assert.deepEqual(received, { port: 3111, url: 'http://preview.test/' });
+});
+
+test('teardown unsubscribes runtime event listeners so stale server events cannot reach the host', async () => {
+  const fake = fakeSdk();
+  const runtime = createVivariRuntime({ id: 'd', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  let received = 0;
+  runtime.on('server-ready', () => { received++; });
+  await runtime.teardown();
+  fake.instance.emitServerReady(3111, 'http://stale.test/');
+  assert.equal(fake.calls.unsubscribe, 1);
+  assert.equal(received, 0);
 });
