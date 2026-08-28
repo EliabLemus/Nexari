@@ -130,7 +130,10 @@ class NexariVivariRuntime implements BrowserRuntime {
 
   on<E extends keyof RuntimeEventMap>(event: E, listener: (...args: RuntimeEventMap[E]) => void): () => void {
     if (event !== 'server-ready') throw new RuntimeError('UNSUPPORTED_CAPABILITY', `Unsupported event ${String(event)}`);
-    const detach = this.#ready().on('server-ready', listener as (port: number, url: string) => void);
+    const forwardIfReady = (port: number, url: string) => {
+      if (this.state === 'ready') (listener as (port: number, url: string) => void)(port, url);
+    };
+    const detach = this.#ready().on('server-ready', forwardIfReady);
     let active = true;
     const ownedDetach = () => {
       if (!active) return;

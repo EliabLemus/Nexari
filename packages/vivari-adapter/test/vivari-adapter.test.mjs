@@ -129,6 +129,22 @@ test('teardown during a pending SDK load reports termination rather than the lat
   assert.equal(runtime.state, 'terminated');
 });
 
+test('server events cannot reach the host once teardown begins, even while preview cleanup is pending', async () => {
+  const fake = fakeSdk();
+  let releasePreviewCleanup;
+  fake.instance.attachPreview = () => () => new Promise((resolve) => { releasePreviewCleanup = resolve; });
+  const runtime = createVivariRuntime({ id: 'teardown-event-race', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  runtime.attachPreview({});
+  let received = 0;
+  runtime.on('server-ready', () => { received++; });
+  const teardown = runtime.teardown();
+  fake.instance.emitServerReady(3111, 'http://stale.test/');
+  assert.equal(received, 0);
+  releasePreviewCleanup();
+  await teardown;
+});
+
 test('preview cleanup failure cannot strand the guest during teardown', async () => {
   const fake = fakeSdk();
   fake.instance.attachPreview = () => () => { throw new Error('iframe cleanup failed'); };
