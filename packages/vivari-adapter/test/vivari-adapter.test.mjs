@@ -51,6 +51,24 @@ test('an already-aborted boot signal fails closed before loading the Vivari SDK'
   assert.equal(runtime.state, 'terminated');
 });
 
+test('a caller abort during SDK loading prevents a late SDK from booting a guest', async () => {
+  let resolveSdk;
+  let guestBoots = 0;
+  const controller = new AbortController();
+  const runtime = createVivariRuntime({
+    id: 'aborted-during-sdk-load',
+    isIsolated: () => true,
+    loadSdk: () => new Promise((resolve) => { resolveSdk = resolve; }),
+  });
+  const boot = runtime.boot({ signal: controller.signal });
+  await new Promise(setImmediate);
+  controller.abort(new Error('caller cancelled boot'));
+  resolveSdk({ boot: async () => { guestBoots++; return fakeSdk().instance; } });
+  await assert.rejects(boot, (error) => error instanceof RuntimeError && error.code === 'BOOT_ABORTED');
+  assert.equal(guestBoots, 0);
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('maps the owned fork and detaches previews on idempotent teardown', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'b', isIsolated: () => true, loadSdk: fake.loader });

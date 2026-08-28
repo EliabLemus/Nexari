@@ -94,6 +94,11 @@ class NexariVivariRuntime implements BrowserRuntime {
     try {
       const sdk = await this.#loadSdk();
       if (this.state !== 'booting') throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while Vivari SDK was loading');
+      if (abortController.signal.aborted) {
+        this.#lifecycle.beginTeardown();
+        this.#lifecycle.markTerminated();
+        throw new RuntimeError('BOOT_ABORTED', 'Runtime boot was cancelled while the Vivari SDK was loading');
+      }
       this.#guestBootPromise = sdk.boot({ signal: abortController.signal });
       this.#guestBootInFlight = true;
       let instance: VivariLike;
@@ -110,7 +115,7 @@ class NexariVivariRuntime implements BrowserRuntime {
       this.#lifecycle.markReady();
     } catch (cause) {
       if (this.#isTornDown()) {
-        if (cause instanceof RuntimeError && cause.code === 'TORN_DOWN') throw cause;
+        if (cause instanceof RuntimeError && (cause.code === 'TORN_DOWN' || cause.code === 'BOOT_ABORTED')) throw cause;
         throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while Vivari was booting');
       }
       if (this.state === 'booting') {
