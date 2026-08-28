@@ -128,10 +128,20 @@ class NexariVivariRuntime implements BrowserRuntime {
   async teardown(): Promise<void> {
     if (this.state === 'terminated') return;
     this.#lifecycle.beginTeardown();
-    for (const detach of [...this.#detachPreview]) detach();
-    for (const detach of [...this.#detachEvents]) detach();
-    await this.#instance?.teardown();
+    let failure: unknown;
+    const cleanUp = (operation: () => void | Promise<void>) => {
+      try {
+        const result = operation();
+        if (result instanceof Promise) return result.catch((error) => { failure ??= error; });
+      } catch (error) {
+        failure ??= error;
+      }
+    };
+    for (const detach of [...this.#detachPreview]) await cleanUp(detach);
+    for (const detach of [...this.#detachEvents]) await cleanUp(detach);
+    await cleanUp(() => this.#instance?.teardown());
     this.#lifecycle.markTerminated();
+    if (failure) throw failure;
   }
 
   getCapabilities(): RuntimeCapabilities { return unsupportedCapabilities(); }

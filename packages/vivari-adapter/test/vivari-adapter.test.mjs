@@ -86,3 +86,14 @@ test('teardown during a pending boot tears down the late guest instead of leakin
   assert.equal(fake.calls.teardown, 1);
   assert.equal(runtime.state, 'terminated');
 });
+
+test('preview cleanup failure cannot strand the guest during teardown', async () => {
+  const fake = fakeSdk();
+  fake.instance.attachPreview = () => () => { throw new Error('iframe cleanup failed'); };
+  const runtime = createVivariRuntime({ id: 'f', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  runtime.attachPreview({});
+  await assert.rejects(runtime.teardown(), /iframe cleanup failed/);
+  assert.equal(fake.calls.teardown, 1);
+  assert.equal(runtime.state, 'terminated');
+});
