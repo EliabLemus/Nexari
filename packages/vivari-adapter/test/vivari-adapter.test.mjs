@@ -281,6 +281,22 @@ test('preview cleanup failure cannot strand the guest during teardown', async ()
   assert.equal(runtime.state, 'terminated');
 });
 
+test('teardown retries owned guest cleanup after a prior teardown failure', async () => {
+  const fake = fakeSdk();
+  let guestTeardownAttempts = 0;
+  fake.instance.teardown = () => {
+    guestTeardownAttempts++;
+    fake.calls.teardown++;
+    if (guestTeardownAttempts === 1) throw new Error('guest teardown failed once');
+  };
+  const runtime = createVivariRuntime({ id: 'retry-failed-teardown', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  await assert.rejects(runtime.teardown(), /guest teardown failed once/);
+  await runtime.teardown();
+  assert.equal(guestTeardownAttempts, 2);
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('teardown waits for asynchronous preview detachment before terminating the guest', async () => {
   const fake = fakeSdk();
   let releasePreviewDetach;

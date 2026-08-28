@@ -51,6 +51,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   #guestBootInFlight = false;
   #bootAbortController: AbortController | undefined;
   #teardownPromise: Promise<void> | undefined;
+  #teardownFailed = false;
   #isIsolated: () => boolean;
   #loadSdk: () => Promise<VivariSdk>;
 
@@ -206,10 +207,17 @@ class NexariVivariRuntime implements BrowserRuntime {
   }
 
   async teardown(): Promise<void> {
-    if (this.state === 'terminated') return;
     if (this.#teardownPromise) return this.#teardownPromise;
+    if (this.state === 'terminated' && !this.#teardownFailed) return;
+    this.#teardownFailed = false;
     this.#teardownPromise = this.#teardown();
-    return this.#teardownPromise;
+    try {
+      await this.#teardownPromise;
+    } catch (error) {
+      this.#teardownPromise = undefined;
+      this.#teardownFailed = true;
+      throw error;
+    }
   }
 
   async #teardown(): Promise<void> {
