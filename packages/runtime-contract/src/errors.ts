@@ -3,6 +3,7 @@ export type RuntimeErrorCode =
   | 'BACKEND_UNAVAILABLE'
   | 'UNSUPPORTED_CAPABILITY'
   | 'BOOT_FAILED'
+  | 'BOOT_ABORTED'
   | 'TORN_DOWN'
   | 'COMMAND_NOT_FOUND';
 

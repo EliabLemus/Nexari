@@ -37,6 +37,20 @@ test('boot after teardown rejects as torn down before evaluating isolation', asy
   assert.equal(fake.calls.boot, 0);
 });
 
+test('an already-aborted boot signal fails closed before loading the Vivari SDK', async () => {
+  let sdkLoads = 0;
+  const controller = new AbortController();
+  controller.abort(new Error('caller cancelled boot'));
+  const runtime = createVivariRuntime({
+    id: 'aborted-before-sdk-load',
+    isIsolated: () => false,
+    loadSdk: async () => { sdkLoads++; throw new Error('SDK must not load'); },
+  });
+  await assert.rejects(runtime.boot({ signal: controller.signal }), (error) => error instanceof RuntimeError && error.code === 'BOOT_ABORTED');
+  assert.equal(sdkLoads, 0);
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('maps the owned fork and detaches previews on idempotent teardown', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'b', isIsolated: () => true, loadSdk: fake.loader });

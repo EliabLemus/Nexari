@@ -78,6 +78,12 @@ class NexariVivariRuntime implements BrowserRuntime {
     if (this.#isTornDown()) {
       throw new RuntimeError('TORN_DOWN', 'Runtime has been torn down');
     }
+    if (signal?.aborted) {
+      this.#lifecycle.beginBoot();
+      this.#lifecycle.beginTeardown();
+      this.#lifecycle.markTerminated();
+      throw new RuntimeError('BOOT_ABORTED', 'Runtime boot was cancelled before the Vivari SDK loaded');
+    }
     if (!this.#isIsolated()) throw new RuntimeError('ISOLATION_REQUIRED', 'Nexari requires cross-origin isolation and SharedArrayBuffer.');
     this.#lifecycle.beginBoot();
     const abortController = new AbortController();
