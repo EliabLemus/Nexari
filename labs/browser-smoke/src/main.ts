@@ -38,9 +38,12 @@ async function main() {
   void (async () => { for await (const chunk of process.output) write(chunk); })();
   teardownButton.addEventListener('click', async () => {
     teardownButton.disabled = true;
-    await runtime.teardown();
-    preview.removeAttribute('src');
-    preview.hidden = true;
+    try {
+      await runtime.teardown();
+    } finally {
+      preview.removeAttribute('src');
+      preview.hidden = true;
+    }
     status.dataset.state = 'terminated';
     status.textContent = 'Runtime terminated; preview detached';
   }, { once: true });

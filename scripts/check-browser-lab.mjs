@@ -13,6 +13,9 @@ for (const needle of ['createVivariRuntime', 'loadPinnedVivariSdk', 'crossOrigin
 }
 if (source.includes('Vivari.boot')) throw new Error('browser lab must boot Vivari only through the adapter seam');
 if (source.includes('detachPreview();')) throw new Error('browser lab teardown must exercise adapter-owned preview cleanup rather than detach previews itself');
+if (!source.includes('try {\n      await runtime.teardown();\n    } finally {\n      preview.removeAttribute(\'src\');\n      preview.hidden = true;\n    }')) {
+  throw new Error('browser lab must clear the preview iframe even when adapter teardown fails');
+}
 const adapter = await readFile(path.join(root, 'packages', 'vivari-adapter', 'src', 'index.ts'), 'utf8');
 for (const needle of ["import('@vivari/core')", 'Vivari.boot', 'server-ready']) {
   if (!adapter.includes(needle)) throw new Error(`adapter must own the Vivari SDK seam for ${needle}`);
