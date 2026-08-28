@@ -284,6 +284,28 @@ test('a failed caller preview detach remains owned so teardown can retry it', as
   assert.equal(runtime.state, 'terminated');
 });
 
+test('teardown shares a caller-initiated asynchronous preview detach instead of invoking it twice', async () => {
+  const fake = fakeSdk();
+  let releasePreviewDetach;
+  fake.instance.attachPreview = () => () => {
+    fake.calls.detach++;
+    return new Promise((resolve) => { releasePreviewDetach = resolve; });
+  };
+  const runtime = createVivariRuntime({ id: 'share-pending-preview-detach', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const detach = runtime.attachPreview({});
+  const pendingDetach = detach();
+  const teardown = runtime.teardown();
+  await new Promise(setImmediate);
+  assert.equal(fake.calls.detach, 1);
+  assert.equal(fake.calls.teardown, 0);
+  releasePreviewDetach();
+  await Promise.all([pendingDetach, teardown]);
+  assert.equal(fake.calls.detach, 1);
+  assert.equal(fake.calls.teardown, 1);
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('concurrent teardown callers share one cleanup instead of rejecting the later caller', async () => {
   const fake = fakeSdk();
   let releaseTeardown;

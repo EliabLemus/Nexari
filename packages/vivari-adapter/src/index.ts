@@ -155,14 +155,23 @@ class NexariVivariRuntime implements BrowserRuntime {
   attachPreview(iframe: HTMLIFrameElement): () => void | Promise<void> {
     const detach = this.#ready().attachPreview(iframe);
     let active = true;
+    let pendingDetach: Promise<void> | undefined;
     const ownedDetach = (): void | Promise<void> => {
       if (!active) return;
+      if (pendingDetach) return pendingDetach;
       const result = detach();
       if (result instanceof Promise) {
-        return result.then(() => {
-          active = false;
-          this.#detachPreview.delete(ownedDetach);
-        });
+        pendingDetach = result.then(
+          () => {
+            active = false;
+            this.#detachPreview.delete(ownedDetach);
+          },
+          (error) => {
+            pendingDetach = undefined;
+            throw error;
+          },
+        );
+        return pendingDetach;
       }
       active = false;
       this.#detachPreview.delete(ownedDetach);
