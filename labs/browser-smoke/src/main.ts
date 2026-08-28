@@ -1,4 +1,4 @@
-import { Vivari, type FileSystemTree } from '@vivari/core';
+import { createVivariRuntime, loadPinnedVivariSdk } from '../../../packages/vivari-adapter/src/index.ts';
 
 const status = document.querySelector<HTMLParagraphElement>('#status')!;
 const output = document.querySelector<HTMLPreElement>('#output')!;
@@ -6,7 +6,7 @@ const preview = document.querySelector<HTMLIFrameElement>('#preview')!;
 const teardownButton = document.querySelector<HTMLButtonElement>('#teardown')!;
 
 const write = (line: string) => { output.textContent += `${line}\n`; };
-const project: FileSystemTree = {
+const project = {
   'server.js': { file: { contents: [
     "import { createServer } from 'node:http';",
     "const server = createServer((_, res) => { res.setHeader('content-type', 'text/plain'); res.end('Nexari runtime preview OK'); });",
@@ -22,7 +22,9 @@ async function main() {
   }
   status.dataset.state = 'booting';
   status.textContent = 'Booting pinned Vivari runtime…';
-  const runtime = await Vivari.boot();
+  const runtime = createVivariRuntime({ id: crypto.randomUUID(), loadSdk: loadPinnedVivariSdk });
+  await runtime.boot();
+  const detachPreview = runtime.attachPreview(preview);
   await runtime.mount(project);
   runtime.on('server-ready', (port, url) => {
     preview.src = url;
@@ -36,6 +38,7 @@ async function main() {
   void (async () => { for await (const chunk of process.output) write(chunk); })();
   teardownButton.addEventListener('click', async () => {
     teardownButton.disabled = true;
+    detachPreview();
     await runtime.teardown();
     preview.removeAttribute('src');
     preview.hidden = true;

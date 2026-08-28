@@ -6,6 +6,7 @@ import {
   type RuntimeCapabilities,
   type RuntimeFileSystem,
   type RuntimeProcess,
+  type RuntimeEventMap,
 } from '../../runtime-contract/dist/index.js';
 
 export interface VivariLike {
@@ -13,6 +14,7 @@ export interface VivariLike {
   mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void>;
   spawn(command: string, args?: string[], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess>;
   attachPreview(iframe: HTMLIFrameElement): () => void;
+  on(event: 'server-ready', listener: (port: number, url: string) => void): () => void;
   export(path?: string): Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>;
   teardown(): void | Promise<void>;
 }
@@ -29,6 +31,12 @@ export interface VivariAdapterOptions {
 
 export function createVivariRuntime(options: VivariAdapterOptions): BrowserRuntime {
   return new NexariVivariRuntime(options);
+}
+
+/** The sole fork-specific import seam; host applications only call the adapter API. */
+export async function loadPinnedVivariSdk(): Promise<VivariSdk> {
+  const { Vivari } = await import('@vivari/core');
+  return { boot: (options) => Vivari.boot(options) };
 }
 
 class NexariVivariRuntime implements BrowserRuntime {
@@ -89,6 +97,11 @@ class NexariVivariRuntime implements BrowserRuntime {
     };
     this.#detachPreview.add(ownedDetach);
     return ownedDetach;
+  }
+
+  on<E extends keyof RuntimeEventMap>(event: E, listener: (...args: RuntimeEventMap[E]) => void): () => void {
+    if (event !== 'server-ready') throw new RuntimeError('UNSUPPORTED_CAPABILITY', `Unsupported event ${String(event)}`);
+    return this.#ready().on('server-ready', listener as (port: number, url: string) => void);
   }
 
   async export(path?: string): Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }> {

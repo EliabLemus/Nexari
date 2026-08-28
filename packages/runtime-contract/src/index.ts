@@ -25,6 +25,10 @@ export interface RuntimeProcess {
   kill(): void;
 }
 
+export type RuntimeEventMap = {
+  'server-ready': [port: number, url: string];
+};
+
 export interface BrowserRuntime {
   readonly id: string;
   readonly state: RuntimeState;
@@ -33,6 +37,7 @@ export interface BrowserRuntime {
   mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void>;
   spawn(command: string, args?: string[], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess>;
   attachPreview(iframe: HTMLIFrameElement): () => void;
+  on<E extends keyof RuntimeEventMap>(event: E, listener: (...args: RuntimeEventMap[E]) => void): () => void;
   export(path?: string): Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>;
   teardown(): Promise<void>;
   getCapabilities(): RuntimeCapabilities;

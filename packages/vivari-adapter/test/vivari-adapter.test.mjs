@@ -8,15 +8,18 @@ const stream = new ReadableStream({ start(controller) { controller.close(); } })
 
 function fakeSdk() {
   const calls = { boot: 0, mount: 0, spawn: 0, teardown: 0, detach: 0 };
+  let serverReady;
   const instance = {
     fs: { readFile: async () => 'ok', writeFile: async () => {}, readdir: async () => [], mkdir: async () => {}, rm: async () => {} },
     mount: async () => { calls.mount++; },
     spawn: async () => { calls.spawn++; return { pid: 41, output: stream, stdout: stream, stderr: stream, input: new WritableStream(), exit: Promise.resolve(0), kill() {} }; },
+    on: (_event, listener) => { serverReady = listener; return () => { serverReady = undefined; }; },
+    emitServerReady: (...args) => serverReady?.(...args),
     attachPreview: () => () => { calls.detach++; },
     export: async () => ({ files: [], truncated: false }),
     teardown: () => { calls.teardown++; },
   };
-  return { calls, loader: async () => ({ boot: async () => { calls.boot++; return instance; } }) };
+  return { calls, instance, loader: async () => ({ boot: async () => { calls.boot++; return instance; } }) };
 }
 
 test('rejects without isolation before booting the fork', async () => {
@@ -41,4 +44,15 @@ test('maps the owned fork and detaches previews on idempotent teardown', async (
   assert.deepEqual(fake.calls, { boot: 1, mount: 1, spawn: 1, teardown: 1, detach: 1 });
   assert.equal(runtime.state, 'terminated');
   await assert.rejects(runtime.spawn('node'), (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+});
+
+test('forwards server readiness as a typed runtime event', async () => {
+  const fake = fakeSdk();
+  const runtime = createVivariRuntime({ id: 'c', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  let received;
+  const off = runtime.on('server-ready', (port, url) => { received = { port, url }; });
+  fake.instance.emitServerReady(3111, 'http://preview.test/');
+  off();
+  assert.deepEqual(received, { port: 3111, url: 'http://preview.test/' });
 });

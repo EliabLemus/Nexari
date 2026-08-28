@@ -8,8 +8,17 @@ for (const relative of ['index.html', 'src/main.ts', 'vite.config.ts', 'package.
   await access(path.join(lab, relative));
 }
 const source = await readFile(path.join(lab, 'src/main.ts'), 'utf8');
-for (const needle of ['Vivari.boot', 'crossOriginIsolated', 'SharedArrayBuffer', 'server-ready', 'server.listen', 'teardown']) {
+for (const needle of ['createVivariRuntime', 'loadPinnedVivariSdk', 'crossOriginIsolated', 'SharedArrayBuffer', 'attachPreview', 'server-ready', 'server.listen', 'teardown']) {
   if (!source.includes(needle)) throw new Error(`browser lab must exercise ${needle}`);
+}
+if (source.includes('Vivari.boot')) throw new Error('browser lab must boot Vivari only through the adapter seam');
+const adapter = await readFile(path.join(root, 'packages', 'vivari-adapter', 'src', 'index.ts'), 'utf8');
+for (const needle of ["import('@vivari/core')", 'Vivari.boot', 'server-ready']) {
+  if (!adapter.includes(needle)) throw new Error(`adapter must own the Vivari SDK seam for ${needle}`);
+}
+for (const relative of ['labs/browser-smoke/src/main.ts', 'labs/browser-smoke/src/sdk.ts']) {
+  const candidate = await readFile(path.join(root, relative), 'utf8');
+  if (candidate.includes('@vivari/core')) throw new Error(`${relative} must not import Vivari directly; the adapter owns the fork boundary`);
 }
 const config = await readFile(path.join(lab, 'vite.config.ts'), 'utf8');
 for (const needle of ['Cross-Origin-Opener-Policy', 'same-origin', 'Cross-Origin-Embedder-Policy', 'require-corp', 'Service-Worker-Allowed']) {
