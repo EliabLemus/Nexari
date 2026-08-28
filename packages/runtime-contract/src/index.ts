@@ -81,11 +81,39 @@ export class RuntimeLifecycle {
   }
 }
 
-export async function createRuntime(options: { backend: RuntimeBackend }): Promise<BrowserRuntime> {
+export type RuntimeFactoryOptions =
+  | { backend: 'stackblitz' }
+  | {
+    backend: 'vivari';
+    id: string;
+    isIsolated?: () => boolean;
+    loadSdk?: () => Promise<unknown>;
+  };
+
+type VivariAdapterFactory = {
+  createVivariRuntime(options: {
+    id: string;
+    isIsolated?: () => boolean;
+    loadSdk: () => Promise<unknown>;
+  }): BrowserRuntime;
+  loadPinnedVivariSdk: () => Promise<unknown>;
+};
+
+/**
+ * Selects a host-owned backend. StackBlitz remains deliberately unavailable;
+ * Vivari is loaded through the adapter so this contract never imports its SDK.
+ */
+export async function createRuntime(options: RuntimeFactoryOptions): Promise<BrowserRuntime> {
   if (options.backend === 'stackblitz') {
     throw new RuntimeError('BACKEND_UNAVAILABLE', 'The StackBlitz backend is intentionally not bundled with Nexari.');
   }
-  throw new RuntimeError('BACKEND_UNAVAILABLE', 'The Nexari Vivari adapter has not been linked in this milestone.');
+  const adapterPath = '../../vivari-adapter/dist/index.js';
+  const adapter = await import(adapterPath) as VivariAdapterFactory;
+  return adapter.createVivariRuntime({
+    id: options.id,
+    isIsolated: options.isIsolated,
+    loadSdk: options.loadSdk ?? adapter.loadPinnedVivariSdk,
+  });
 }
 
 export function declaredCapabilities(): RuntimeCapabilities {

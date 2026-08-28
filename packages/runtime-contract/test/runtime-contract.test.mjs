@@ -15,6 +15,24 @@ test('stackblitz selection rejects without importing external resources', async 
   );
 });
 
+test('vivari selection links only to the owned adapter and preserves injected isolation checks', async () => {
+  let booted = 0;
+  const runtime = await createRuntime({
+    backend: 'vivari',
+    id: 'contract-linked-vivari',
+    isIsolated: () => false,
+    loadSdk: async () => ({
+      boot: async () => {
+        booted++;
+        throw new Error('must not boot without isolation');
+      },
+    }),
+  });
+  assert.equal(runtime.id, 'contract-linked-vivari');
+  await assert.rejects(runtime.boot(), (error) => error instanceof RuntimeError && error.code === 'ISOLATION_REQUIRED');
+  assert.equal(booted, 0);
+});
+
 test('lifecycle only permits idempotent teardown after termination', () => {
   const lifecycle = new RuntimeLifecycle();
   assert.equal(lifecycle.state, 'created');
