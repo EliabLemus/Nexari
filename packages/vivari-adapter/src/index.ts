@@ -1,0 +1,117 @@
+import {
+  RuntimeError,
+  RuntimeLifecycle,
+  unsupportedCapabilities,
+  type BrowserRuntime,
+  type RuntimeCapabilities,
+  type RuntimeFileSystem,
+  type RuntimeProcess,
+} from '../../runtime-contract/dist/index.js';
+
+export interface VivariLike {
+  fs: RuntimeFileSystem;
+  mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void>;
+  spawn(command: string, args?: string[], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess>;
+  attachPreview(iframe: HTMLIFrameElement): () => void;
+  export(path?: string): Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>;
+  teardown(): void | Promise<void>;
+}
+
+export interface VivariSdk {
+  boot(options?: { signal?: AbortSignal }): Promise<VivariLike>;
+}
+
+export interface VivariAdapterOptions {
+  id: string;
+  isIsolated?: () => boolean;
+  loadSdk: () => Promise<VivariSdk>;
+}
+
+export function createVivariRuntime(options: VivariAdapterOptions): BrowserRuntime {
+  return new NexariVivariRuntime(options);
+}
+
+class NexariVivariRuntime implements BrowserRuntime {
+  readonly id: string;
+  readonly fs: RuntimeFileSystem;
+  #lifecycle = new RuntimeLifecycle();
+  #instance: VivariLike | undefined;
+  #detachPreview = new Set<() => void>();
+  #isIsolated: () => boolean;
+  #loadSdk: () => Promise<VivariSdk>;
+
+  constructor({ id, isIsolated = defaultIsolation, loadSdk }: VivariAdapterOptions) {
+    this.id = id;
+    this.#isIsolated = isIsolated;
+    this.#loadSdk = loadSdk;
+    this.fs = {
+      readFile: (path, encoding) => this.#ready().fs.readFile(path, encoding),
+      writeFile: (path, contents) => this.#ready().fs.writeFile(path, contents),
+      readdir: (path) => this.#ready().fs.readdir(path),
+      mkdir: (path, options) => this.#ready().fs.mkdir(path, options),
+      rm: (path, options) => this.#ready().fs.rm(path, options),
+    };
+  }
+
+  get state() { return this.#lifecycle.state; }
+
+  async boot({ signal }: { signal?: AbortSignal } = {}): Promise<void> {
+    if (!this.#isIsolated()) throw new RuntimeError('ISOLATION_REQUIRED', 'Nexari requires cross-origin isolation and SharedArrayBuffer.');
+    this.#lifecycle.beginBoot();
+    try {
+      const sdk = await this.#loadSdk();
+      this.#instance = await sdk.boot({ signal });
+      this.#lifecycle.markReady();
+    } catch (cause) {
+      this.#lifecycle.beginTeardown();
+      this.#lifecycle.markTerminated();
+      if (cause instanceof RuntimeError) throw cause;
+      throw new RuntimeError('BOOT_FAILED', cause instanceof Error ? cause.message : 'Vivari boot failed');
+    }
+  }
+
+  async mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void> {
+    await this.#ready().mount(tree, options);
+  }
+
+  async spawn(command: string, args: string[] = [], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess> {
+    return this.#ready().spawn(command, args, options);
+  }
+
+  attachPreview(iframe: HTMLIFrameElement): () => void {
+    const detach = this.#ready().attachPreview(iframe);
+    let active = true;
+    const ownedDetach = () => {
+      if (!active) return;
+      active = false;
+      this.#detachPreview.delete(ownedDetach);
+      detach();
+    };
+    this.#detachPreview.add(ownedDetach);
+    return ownedDetach;
+  }
+
+  async export(path?: string): Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }> {
+    return this.#ready().export(path);
+  }
+
+  async teardown(): Promise<void> {
+    if (this.state === 'terminated') return;
+    this.#lifecycle.beginTeardown();
+    for (const detach of [...this.#detachPreview]) detach();
+    await this.#instance?.teardown();
+    this.#lifecycle.markTerminated();
+  }
+
+  getCapabilities(): RuntimeCapabilities { return unsupportedCapabilities(); }
+
+  #ready(): VivariLike {
+    if (this.state === 'terminated' || this.state === 'tearing_down') throw new RuntimeError('TORN_DOWN', 'Runtime has been torn down');
+    if (!this.#instance || this.state !== 'ready') throw new RuntimeError('BOOT_FAILED', 'Runtime is not ready');
+    return this.#instance;
+  }
+}
+
+function defaultIsolation(): boolean {
+  return typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined';
+}
