@@ -87,6 +87,21 @@ test('teardown during a pending boot tears down the late guest instead of leakin
   assert.equal(runtime.state, 'terminated');
 });
 
+test('teardown during a pending SDK load reports termination rather than the late loader failure', async () => {
+  let rejectLoad;
+  const runtime = createVivariRuntime({
+    id: 'loader-race',
+    isIsolated: () => true,
+    loadSdk: () => new Promise((_resolve, reject) => { rejectLoad = reject; }),
+  });
+  const boot = runtime.boot();
+  await Promise.resolve();
+  await runtime.teardown();
+  rejectLoad(new Error('SDK network failed after teardown'));
+  await assert.rejects(boot, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('preview cleanup failure cannot strand the guest during teardown', async () => {
   const fake = fakeSdk();
   fake.instance.attachPreview = () => () => { throw new Error('iframe cleanup failed'); };
