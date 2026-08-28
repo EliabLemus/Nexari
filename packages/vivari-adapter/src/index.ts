@@ -46,6 +46,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   #instance: VivariLike | undefined;
   #detachPreview = new Set<() => void>();
   #detachEvents = new Set<() => void>();
+  #teardownPromise: Promise<void> | undefined;
   #isIsolated: () => boolean;
   #loadSdk: () => Promise<VivariSdk>;
 
@@ -127,6 +128,12 @@ class NexariVivariRuntime implements BrowserRuntime {
 
   async teardown(): Promise<void> {
     if (this.state === 'terminated') return;
+    if (this.#teardownPromise) return this.#teardownPromise;
+    this.#teardownPromise = this.#teardown();
+    return this.#teardownPromise;
+  }
+
+  async #teardown(): Promise<void> {
     this.#lifecycle.beginTeardown();
     let failure: unknown;
     const cleanUp = (operation: () => void | Promise<void>) => {

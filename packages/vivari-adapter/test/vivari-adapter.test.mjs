@@ -97,3 +97,20 @@ test('preview cleanup failure cannot strand the guest during teardown', async ()
   assert.equal(fake.calls.teardown, 1);
   assert.equal(runtime.state, 'terminated');
 });
+
+test('concurrent teardown callers share one cleanup instead of rejecting the later caller', async () => {
+  const fake = fakeSdk();
+  let releaseTeardown;
+  fake.instance.teardown = () => {
+    fake.calls.teardown++;
+    return new Promise((resolve) => { releaseTeardown = resolve; });
+  };
+  const runtime = createVivariRuntime({ id: 'g', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const first = runtime.teardown();
+  const second = runtime.teardown();
+  releaseTeardown();
+  await Promise.all([first, second]);
+  assert.equal(fake.calls.teardown, 1);
+  assert.equal(runtime.state, 'terminated');
+});
