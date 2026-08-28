@@ -108,13 +108,16 @@ class NexariVivariRuntime implements BrowserRuntime {
         this.#guestBootInFlight = false;
       }
       if (abortController.signal.aborted) {
+        let cleanupFailure: unknown;
         try {
           await instance.teardown();
+        } catch (error) {
+          cleanupFailure = error;
         } finally {
           this.#lifecycle.beginTeardown();
           this.#lifecycle.markTerminated();
         }
-        throw new RuntimeError('BOOT_ABORTED', 'Runtime boot was cancelled while Vivari was booting');
+        throw new RuntimeError('BOOT_ABORTED', 'Runtime boot was cancelled while Vivari was booting', cleanupFailure);
       }
       if (this.state !== 'booting') {
         await instance.teardown();
