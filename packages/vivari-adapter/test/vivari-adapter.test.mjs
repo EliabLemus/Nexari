@@ -104,6 +104,17 @@ test('maps the owned fork and detaches previews on idempotent teardown', async (
   await assert.rejects(runtime.spawn('node'), (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
 });
 
+test('maps the owned fork command-not-found rejection to the runtime contract', async () => {
+  const fake = fakeSdk();
+  const guestError = Object.assign(new Error('command missing'), { code: 'ERR_COMMAND_NOT_FOUND' });
+  fake.instance.spawn = async () => { throw guestError; };
+  const runtime = createVivariRuntime({ id: 'command-not-found', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  await assert.rejects(runtime.spawn('missing-command'), (error) =>
+    error instanceof RuntimeError && error.code === 'COMMAND_NOT_FOUND' && error.cause === guestError,
+  );
+});
+
 test('forwards server readiness as a typed runtime event', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'c', isIsolated: () => true, loadSdk: fake.loader });

@@ -144,7 +144,12 @@ class NexariVivariRuntime implements BrowserRuntime {
   }
 
   async spawn(command: string, args: string[] = [], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess> {
-    return this.#ready().spawn(command, args, options);
+    try {
+      return await this.#ready().spawn(command, args, options);
+    } catch (cause) {
+      if (isVivariCommandNotFound(cause)) throw new RuntimeError('COMMAND_NOT_FOUND', cause.message, cause);
+      throw cause;
+    }
   }
 
   attachPreview(iframe: HTMLIFrameElement): () => void | Promise<void> {
@@ -229,4 +234,8 @@ class NexariVivariRuntime implements BrowserRuntime {
 
 function defaultIsolation(): boolean {
   return typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined';
+}
+
+function isVivariCommandNotFound(cause: unknown): cause is Error & { code: 'ERR_COMMAND_NOT_FOUND' } {
+  return cause instanceof Error && (cause as { code?: unknown }).code === 'ERR_COMMAND_NOT_FOUND';
 }
