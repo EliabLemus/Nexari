@@ -29,6 +29,14 @@ test('rejects without isolation before booting the fork', async () => {
   assert.equal(fake.calls.boot, 0);
 });
 
+test('boot after teardown rejects as torn down before evaluating isolation', async () => {
+  const fake = fakeSdk();
+  const runtime = createVivariRuntime({ id: 'terminated-before-boot', isIsolated: () => false, loadSdk: fake.loader });
+  await runtime.teardown();
+  await assert.rejects(runtime.boot(), (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  assert.equal(fake.calls.boot, 0);
+});
+
 test('maps the owned fork and detaches previews on idempotent teardown', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'b', isIsolated: () => true, loadSdk: fake.loader });

@@ -74,6 +74,9 @@ class NexariVivariRuntime implements BrowserRuntime {
   }
 
   async #boot(signal?: AbortSignal): Promise<void> {
+    if (this.#isTornDown()) {
+      throw new RuntimeError('TORN_DOWN', 'Runtime has been torn down');
+    }
     if (!this.#isIsolated()) throw new RuntimeError('ISOLATION_REQUIRED', 'Nexari requires cross-origin isolation and SharedArrayBuffer.');
     this.#lifecycle.beginBoot();
     try {
@@ -176,6 +179,10 @@ class NexariVivariRuntime implements BrowserRuntime {
   }
 
   getCapabilities(): RuntimeCapabilities { return unsupportedCapabilities(); }
+
+  #isTornDown(): boolean {
+    return this.state === 'terminated' || this.state === 'tearing_down';
+  }
 
   #ready(): VivariLike {
     if (this.state === 'terminated' || this.state === 'tearing_down') throw new RuntimeError('TORN_DOWN', 'Runtime has been torn down');
