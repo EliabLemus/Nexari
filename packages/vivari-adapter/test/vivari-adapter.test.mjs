@@ -68,3 +68,21 @@ test('teardown unsubscribes runtime event listeners so stale server events canno
   assert.equal(fake.calls.unsubscribe, 1);
   assert.equal(received, 0);
 });
+
+test('teardown during a pending boot tears down the late guest instead of leaking it', async () => {
+  const fake = fakeSdk();
+  let resolveBoot;
+  const runtime = createVivariRuntime({
+    id: 'e',
+    isIsolated: () => true,
+    loadSdk: async () => ({ boot: () => new Promise((resolve) => { resolveBoot = resolve; }) }),
+  });
+  const boot = runtime.boot();
+  await Promise.resolve();
+  const teardown = runtime.teardown();
+  resolveBoot(fake.instance);
+  await teardown;
+  await assert.rejects(boot, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  assert.equal(fake.calls.teardown, 1);
+  assert.equal(runtime.state, 'terminated');
+});
