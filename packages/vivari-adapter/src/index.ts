@@ -70,6 +70,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   get state() { return this.#lifecycle.state; }
 
   boot({ signal }: { signal?: AbortSignal } = {}): Promise<void> {
+    if (this.#isTornDown()) return Promise.reject(new RuntimeError('TORN_DOWN', 'Runtime has been torn down'));
     if (!this.#bootPromise) this.#bootPromise = this.#boot(signal);
     return this.#bootPromise;
   }

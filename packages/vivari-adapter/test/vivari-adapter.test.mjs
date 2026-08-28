@@ -37,6 +37,16 @@ test('boot after teardown rejects as torn down before evaluating isolation', asy
   assert.equal(fake.calls.boot, 0);
 });
 
+test('boot after a successful boot and teardown rejects as torn down', async () => {
+  const fake = fakeSdk();
+  const runtime = createVivariRuntime({ id: 'terminated-after-boot', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  await runtime.teardown();
+  await assert.rejects(runtime.boot(), (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  assert.equal(fake.calls.boot, 1);
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('an already-aborted boot signal fails closed before loading the Vivari SDK', async () => {
   let sdkLoads = 0;
   const controller = new AbortController();
