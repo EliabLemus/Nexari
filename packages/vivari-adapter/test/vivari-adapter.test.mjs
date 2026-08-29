@@ -194,6 +194,30 @@ test('maps the owned fork command-not-found rejection to the runtime contract', 
   );
 });
 
+test('a process that resolves after teardown is killed and never returned to the host', async () => {
+  const fake = fakeSdk();
+  let resolveSpawn;
+  let kills = 0;
+  const lateProcess = {
+    pid: 42,
+    output: stream,
+    stdout: stream,
+    stderr: stream,
+    input: new WritableStream(),
+    exit: Promise.resolve(0),
+    kill() { kills++; },
+  };
+  fake.instance.spawn = () => new Promise((resolve) => { resolveSpawn = resolve; });
+  const runtime = createVivariRuntime({ id: 'late-spawn-after-teardown', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const spawn = runtime.spawn('node', ['server.js']);
+  await new Promise(setImmediate);
+  await runtime.teardown();
+  resolveSpawn(lateProcess);
+  await assert.rejects(spawn, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  assert.equal(kills, 1);
+});
+
 test('forwards server readiness as a typed runtime event', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'c', isIsolated: () => true, loadSdk: fake.loader });

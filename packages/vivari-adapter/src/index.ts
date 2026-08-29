@@ -170,7 +170,16 @@ class NexariVivariRuntime implements BrowserRuntime {
 
   async spawn(command: string, args: string[] = [], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess> {
     try {
-      return await this.#ready().spawn(command, args, options);
+      const process = await this.#ready().spawn(command, args, options);
+      if (this.state !== 'ready') {
+        try {
+          process.kill();
+        } catch {
+          // A late process cannot be exposed after teardown, even if guest cleanup rejects.
+        }
+        throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while a process was starting');
+      }
+      return process;
     } catch (cause) {
       if (isVivariCommandNotFound(cause)) throw new RuntimeError('COMMAND_NOT_FOUND', cause.message, cause);
       throw cause;
