@@ -25,6 +25,12 @@ npm run build
 git diff --check
 ```
 
+## Automation and releases
+
+GitHub Actions runs deterministic checks on pull requests and `main`, plus a read-only weekly verification run. Releases are deliberately manual: first commit matching stable `X.Y.Z` metadata in `package.json` and `CHANGELOG.md`, then dispatch **Create Nexari Release** with that exact version. It validates the complete gate set before creating the `vX.Y.Z` source tag and GitHub Release.
+
+Nexari does **not** publish npm packages. See [`CHANGELOG.md`](CHANGELOG.md) for the release checklist.
+
 ## Source policy
 
 See `compatibility/stackblitz-public-contract-ledger.md`, `compatibility/bolt-webcontainers-inventory.json`, `compatibility/bolt-open-runtime-issues.json`, and the OpenSpec change under `openspec/changes/add-bolt-compatible-vivari-runtime/`.

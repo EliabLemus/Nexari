@@ -1,0 +1,50 @@
+name: Create Nexari Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable SemVer version already committed to package.json and CHANGELOG.md (for example 0.1.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: npm run check:release -- "$RELEASE_VERSION"
+      - run: npm run typecheck
+      - run: npm run generate:compatibility
+      - run: git diff --exit-code -- compatibility
+      - run: npm test
+      - run: npm run build
+      - run: git diff --check
+
+  release:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create immutable source tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: gh release create "v$RELEASE_VERSION" --target "$GITHUB_SHA" --title "v$RELEASE_VERSION" --generate-notes
