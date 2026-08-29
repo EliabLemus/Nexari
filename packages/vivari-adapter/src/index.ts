@@ -21,7 +21,7 @@ export interface VivariLike {
   };
   mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void>;
   spawn(command: string, args?: string[], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess>;
-  attachPreview(iframe: HTMLIFrameElement): () => void | Promise<void>;
+  attachPreview(iframe: HTMLIFrameElement): () => void | PromiseLike<void>;
   on(event: 'server-ready', listener: (port: number, url: string) => void): () => void;
   export(path?: string): Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>;
   teardown(): void | Promise<void>;
@@ -52,7 +52,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   readonly fs: RuntimeFileSystem;
   #lifecycle = new RuntimeLifecycle();
   #instance: VivariLike | undefined;
-  #detachPreview = new Set<() => void | Promise<void>>();
+  #detachPreview = new Set<() => void | PromiseLike<void>>();
   #detachEvents = new Set<() => void>();
   #bootPromise: Promise<void> | undefined;
   #guestBootPromise: Promise<VivariLike> | undefined;
@@ -196,16 +196,16 @@ class NexariVivariRuntime implements BrowserRuntime {
     }
   }
 
-  attachPreview(iframe: HTMLIFrameElement): () => void | Promise<void> {
+  attachPreview(iframe: HTMLIFrameElement): () => void | PromiseLike<void> {
     const detach = this.#ready().attachPreview(iframe);
     let active = true;
     let pendingDetach: Promise<void> | undefined;
-    const ownedDetach = (): void | Promise<void> => {
+    const ownedDetach = (): void | PromiseLike<void> => {
       if (!active) return;
       if (pendingDetach) return pendingDetach;
       const result = detach();
-      if (result instanceof Promise) {
-        pendingDetach = result.then(
+      if (result && typeof (result as PromiseLike<void>).then === 'function') {
+        pendingDetach = Promise.resolve(result).then(
           () => {
             active = false;
             this.#detachPreview.delete(ownedDetach);
@@ -264,7 +264,7 @@ class NexariVivariRuntime implements BrowserRuntime {
     this.#bootAbortController?.abort();
     if (this.#guestBootInFlight) await this.#bootPromise?.catch(() => undefined);
     let failure: unknown;
-    const cleanUp = (operation: () => void | Promise<void>) => {
+    const cleanUp = (operation: () => void | PromiseLike<void>) => {
       try {
         const result = operation();
         if (result instanceof Promise) return result.catch((error) => { failure ??= error; });
