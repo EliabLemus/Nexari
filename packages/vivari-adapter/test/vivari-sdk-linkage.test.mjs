@@ -22,3 +22,14 @@ test('the owned Vivari fork exposes the adapter seam at runtime', async () => {
   }
   assert.ok(coreEntrypoint.pathname.startsWith(`${repositoryRoot.replace(/\/$/, '')}/runtime/vivari/`), 'the runtime proof must load the owned fork');
 });
+
+test('the owned Vivari export seam normalizes kernel file bytes to the adapter contents contract', async () => {
+  const { Vivari } = await import(coreEntrypoint.href);
+  const bytes = new Uint8Array([0, 255, 42]);
+  const result = await Vivari.prototype.export.call({
+    internal: {
+      request: async () => ({ files: [{ path: 'fixture.bin', bytes }], truncated: false }),
+    },
+  });
+  assert.deepEqual(result, { files: [{ path: 'fixture.bin', contents: bytes }], truncated: false });
+});
