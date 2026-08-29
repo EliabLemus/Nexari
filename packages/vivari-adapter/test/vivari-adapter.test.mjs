@@ -244,6 +244,19 @@ test('an export that resolves after teardown never exposes a stale filesystem sn
   await assert.rejects(snapshot, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
 });
 
+test('a readFile that resolves after teardown never exposes stale guest file data', async () => {
+  const fake = fakeSdk();
+  let resolveRead;
+  fake.instance.fs.readFile = () => new Promise((resolve) => { resolveRead = resolve; });
+  const runtime = createVivariRuntime({ id: 'late-read-after-teardown', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const read = runtime.fs.readFile('secret.txt', 'utf8');
+  await new Promise(setImmediate);
+  await runtime.teardown();
+  resolveRead('secret contents');
+  await assert.rejects(read, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+});
+
 test('forwards server readiness as a typed runtime event', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'c', isIsolated: () => true, loadSdk: fake.loader });
