@@ -270,6 +270,19 @@ test('a writeFile that resolves after teardown never reports success for a torn-
   await assert.rejects(write, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
 });
 
+test('a readdir that resolves after teardown never exposes a stale guest directory listing', async () => {
+  const fake = fakeSdk();
+  let resolveList;
+  fake.instance.fs.readdir = () => new Promise((resolve) => { resolveList = resolve; });
+  const runtime = createVivariRuntime({ id: 'late-readdir-after-teardown', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const listing = runtime.fs.readdir('secret-dir');
+  await new Promise(setImmediate);
+  await runtime.teardown();
+  resolveList(['secret.txt']);
+  await assert.rejects(listing, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+});
+
 test('forwards server readiness as a typed runtime event', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'c', isIsolated: () => true, loadSdk: fake.loader });
