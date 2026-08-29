@@ -121,6 +121,33 @@ test('a caller abort during guest boot remains BOOT_ABORTED when late guest clea
   assert.equal(runtime.state, 'terminated');
 });
 
+test('a failed late guest cleanup after caller abort remains owned for a teardown retry', async () => {
+  const fake = fakeSdk();
+  const controller = new AbortController();
+  let resolveGuestBoot;
+  let cleanupAttempts = 0;
+  fake.instance.teardown = () => {
+    cleanupAttempts++;
+    fake.calls.teardown++;
+    if (cleanupAttempts === 1) throw new Error('late guest cleanup failed once');
+  };
+  const runtime = createVivariRuntime({
+    id: 'aborted-guest-cleanup-retry',
+    isIsolated: () => true,
+    loadSdk: async () => ({ boot: () => new Promise((resolve) => { resolveGuestBoot = resolve; }) }),
+  });
+  const boot = runtime.boot({ signal: controller.signal });
+  await new Promise(setImmediate);
+  controller.abort(new Error('caller cancelled boot'));
+  resolveGuestBoot(fake.instance);
+  await assert.rejects(boot, (error) => error instanceof RuntimeError
+    && error.code === 'BOOT_ABORTED'
+    && error.cause?.message === 'late guest cleanup failed once');
+  await runtime.teardown();
+  assert.equal(cleanupAttempts, 2);
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('maps the owned fork and detaches previews on idempotent teardown', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'b', isIsolated: () => true, loadSdk: fake.loader });
