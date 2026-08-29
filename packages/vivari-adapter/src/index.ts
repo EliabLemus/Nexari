@@ -52,6 +52,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   readonly fs: RuntimeFileSystem;
   #lifecycle = new RuntimeLifecycle();
   #instance: VivariLike | undefined;
+  #processes = new Set<RuntimeProcess>();
   #detachPreview = new Set<() => void | PromiseLike<void>>();
   #detachEvents = new Set<() => void>();
   #bootPromise: Promise<void> | undefined;
@@ -219,6 +220,11 @@ class NexariVivariRuntime implements BrowserRuntime {
         }
         throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while a process was starting');
       }
+      this.#processes.add(process);
+      void process.exit.then(
+        () => { this.#processes.delete(process); },
+        () => { this.#processes.delete(process); },
+      );
       return process;
     } catch (cause) {
       if (isVivariCommandNotFound(cause)) throw new RuntimeError('COMMAND_NOT_FOUND', cause.message, cause);
@@ -306,6 +312,14 @@ class NexariVivariRuntime implements BrowserRuntime {
         failure ??= error;
       }
     };
+    for (const process of [...this.#processes]) {
+      try {
+        process.kill();
+        this.#processes.delete(process);
+      } catch (error) {
+        failure ??= error;
+      }
+    }
     for (const detach of [...this.#detachPreview]) await cleanUp(detach);
     for (const detach of [...this.#detachEvents]) await cleanUp(detach);
     const instance = this.#instance;

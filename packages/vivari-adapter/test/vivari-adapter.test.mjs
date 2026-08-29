@@ -183,6 +183,26 @@ test('maps the owned fork and detaches previews on idempotent teardown', async (
   await assert.rejects(runtime.spawn('node'), (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
 });
 
+test('teardown kills a process already returned to the host before tearing down the guest', async () => {
+  const fake = fakeSdk();
+  let kills = 0;
+  fake.instance.spawn = async () => ({
+    pid: 42,
+    output: stream,
+    stdout: stream,
+    stderr: stream,
+    input: new WritableStream(),
+    exit: new Promise(() => {}),
+    kill() { kills++; },
+  });
+  const runtime = createVivariRuntime({ id: 'kill-active-process-on-teardown', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  await runtime.spawn('node', ['server.js']);
+  await runtime.teardown();
+  assert.equal(kills, 1);
+  assert.equal(fake.calls.teardown, 1);
+});
+
 test('maps the owned fork command-not-found rejection to the runtime contract', async () => {
   const fake = fakeSdk();
   const guestError = Object.assign(new Error('command missing'), { code: 'ERR_COMMAND_NOT_FOUND' });
