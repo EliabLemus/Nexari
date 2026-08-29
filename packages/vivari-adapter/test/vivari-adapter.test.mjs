@@ -8,12 +8,14 @@ const stream = new ReadableStream({ start(controller) { controller.close(); } })
 
 function fakeSdk() {
   const calls = { boot: 0, mount: 0, spawn: 0, teardown: 0, detach: 0, unsubscribe: 0 };
+  Object.defineProperty(calls, 'subscribe', { value: 0, writable: true });
   const listeners = new Map();
   const instance = {
     fs: { readFile: async () => 'ok', writeFile: async () => {}, readdir: async () => [], mkdir: async () => {}, rm: async () => {} },
     mount: async () => { calls.mount++; },
     spawn: async () => { calls.spawn++; return { pid: 41, output: stream, stdout: stream, stderr: stream, input: new WritableStream(), exit: Promise.resolve(0), kill() {} }; },
     on: (event, listener) => {
+      calls.subscribe++;
       listeners.set(event, listener);
       return () => { calls.unsubscribe++; listeners.delete(event); };
     },
@@ -49,6 +51,31 @@ test('boot after a successful boot and teardown rejects as torn down', async () 
   await assert.rejects(runtime.boot(), (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
   assert.equal(fake.calls.boot, 1);
   assert.equal(runtime.state, 'terminated');
+});
+
+test('an unsupported event subscription after teardown fails as torn down rather than exposing a capability error', async () => {
+  const fake = fakeSdk();
+  const runtime = createVivariRuntime({ id: 'terminated-unsupported-event', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  await runtime.teardown();
+  assert.throws(
+    () => runtime.on('unsupported-event', () => {}),
+    (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN',
+  );
+  assert.equal(fake.calls.subscribe, 0);
+  assert.equal(fake.calls.unsubscribe, 0);
+});
+
+test('an unsupported event subscription while ready remains an explicit capability error', async () => {
+  const fake = fakeSdk();
+  const runtime = createVivariRuntime({ id: 'ready-unsupported-event', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  assert.throws(
+    () => runtime.on('unsupported-event', () => {}),
+    (error) => error instanceof RuntimeError && error.code === 'UNSUPPORTED_CAPABILITY',
+  );
+  assert.equal(fake.calls.subscribe, 0);
+  assert.equal(fake.calls.unsubscribe, 0);
 });
 
 test('an already-aborted boot signal fails closed before loading the Vivari SDK', async () => {
