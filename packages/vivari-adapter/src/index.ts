@@ -10,7 +10,15 @@ import {
 } from '../../runtime-contract/dist/index.js';
 
 export interface VivariLike {
-  fs: RuntimeFileSystem;
+  /** Narrow view of the owned fork API; the host contract is adapted below. */
+  fs: {
+    readFile(path: string): Promise<Uint8Array>;
+    readFile(path: string, encoding: 'utf8' | 'utf-8'): Promise<string>;
+    writeFile(path: string, contents: Uint8Array | string): Promise<void>;
+    readdir(path: string): Promise<string[]>;
+    mkdir(path: string, options?: { recursive?: boolean }): Promise<void>;
+    rm(path: string, options?: { recursive?: boolean; force?: boolean }): Promise<void>;
+  };
   mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void>;
   spawn(command: string, args?: string[], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess>;
   attachPreview(iframe: HTMLIFrameElement): () => void | Promise<void>;
@@ -60,7 +68,9 @@ class NexariVivariRuntime implements BrowserRuntime {
     this.#isIsolated = isIsolated;
     this.#loadSdk = loadSdk;
     this.fs = {
-      readFile: (path, encoding) => this.#ready().fs.readFile(path, encoding),
+      readFile: (path, encoding) => encoding
+        ? this.#ready().fs.readFile(path, encoding)
+        : this.#ready().fs.readFile(path),
       writeFile: (path, contents) => this.#ready().fs.writeFile(path, contents),
       readdir: (path) => this.#ready().fs.readdir(path),
       mkdir: (path, options) => this.#ready().fs.mkdir(path, options),

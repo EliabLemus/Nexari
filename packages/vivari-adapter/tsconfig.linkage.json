@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "skipLibCheck": true,
+    "baseUrl": "../..",
+    "paths": {
+      "@vivari/core": ["runtime/vivari/packages/core/dist/index.d.ts"]
+    }
+  },
+  "include": ["src/index.ts", "test/linkage.ts"]
+}

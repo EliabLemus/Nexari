@@ -15,7 +15,7 @@
     "check:browser-lab": "node scripts/check-browser-lab.mjs",
     "build:vivari": "node scripts/build-vivari.mjs",
     "test:runtime-contract": "tsc -p packages/runtime-contract/tsconfig.json && node --test packages/runtime-contract/test/runtime-contract.test.mjs",
-    "test:vivari-adapter": "tsc -p packages/runtime-contract/tsconfig.json && tsc -p packages/vivari-adapter/tsconfig.json && node --test packages/vivari-adapter/test/vivari-adapter.test.mjs",
+    "test:vivari-adapter": "tsc -p packages/runtime-contract/tsconfig.json && tsc -p packages/vivari-adapter/tsconfig.json && node --test packages/vivari-adapter/test/vivari-adapter.test.mjs packages/vivari-adapter/test/vivari-sdk-linkage.test.mjs",
     "typecheck:runtime-contract": "tsc -p packages/runtime-contract/tsconfig.json --noEmit",
     "typecheck:vivari-adapter": "tsc -p packages/vivari-adapter/tsconfig.json --noEmit",
     "test": "npm run test:runtime-contract && npm run test:vivari-adapter && npm run check:openspec && npm run check:bolt-inventory && npm run check:stackblitz-ledger && npm run check:bolt-issues && npm run check:scope && npm run check:vivari-build-runner && npm run check:browser-lab",
