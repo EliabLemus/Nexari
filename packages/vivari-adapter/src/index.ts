@@ -77,7 +77,12 @@ class NexariVivariRuntime implements BrowserRuntime {
         }
         return contents;
       },
-      writeFile: (path, contents) => this.#ready().fs.writeFile(path, contents),
+      writeFile: async (path, contents) => {
+        await this.#ready().fs.writeFile(path, contents);
+        if (this.state !== 'ready') {
+          throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while writing a file');
+        }
+      },
       readdir: (path) => this.#ready().fs.readdir(path),
       mkdir: (path, options) => this.#ready().fs.mkdir(path, options),
       rm: (path, options) => this.#ready().fs.rm(path, options),

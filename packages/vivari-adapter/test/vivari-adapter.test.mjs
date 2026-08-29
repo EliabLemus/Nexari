@@ -257,6 +257,19 @@ test('a readFile that resolves after teardown never exposes stale guest file dat
   await assert.rejects(read, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
 });
 
+test('a writeFile that resolves after teardown never reports success for a torn-down guest', async () => {
+  const fake = fakeSdk();
+  let resolveWrite;
+  fake.instance.fs.writeFile = () => new Promise((resolve) => { resolveWrite = resolve; });
+  const runtime = createVivariRuntime({ id: 'late-write-after-teardown', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const write = runtime.fs.writeFile('secret.txt', 'contents');
+  await new Promise(setImmediate);
+  await runtime.teardown();
+  resolveWrite();
+  await assert.rejects(write, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+});
+
 test('forwards server readiness as a typed runtime event', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'c', isIsolated: () => true, loadSdk: fake.loader });
