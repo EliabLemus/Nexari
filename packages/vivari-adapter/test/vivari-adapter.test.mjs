@@ -312,7 +312,7 @@ test('teardown retries a failed runtime event unsubscribe', async () => {
   await runtime.teardown();
   assert.equal(unsubscribeAttempts, 2);
   assert.equal(fake.calls.unsubscribe, 1);
-  assert.equal(fake.calls.teardown, 2);
+  assert.equal(fake.calls.teardown, 1, 'a retry for a failed event unsubscribe must not tear down an already-cleaned guest twice');
   assert.equal(runtime.state, 'terminated');
 });
 

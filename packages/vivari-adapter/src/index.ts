@@ -235,7 +235,15 @@ class NexariVivariRuntime implements BrowserRuntime {
     };
     for (const detach of [...this.#detachPreview]) await cleanUp(detach);
     for (const detach of [...this.#detachEvents]) await cleanUp(detach);
-    await cleanUp(() => this.#instance?.teardown());
+    const instance = this.#instance;
+    if (instance) {
+      try {
+        await instance.teardown();
+        this.#instance = undefined;
+      } catch (error) {
+        failure ??= error;
+      }
+    }
     this.#lifecycle.markTerminated();
     if (failure) throw failure;
   }
