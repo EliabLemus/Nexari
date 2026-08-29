@@ -282,6 +282,58 @@ test('a mount that resolves after teardown rejects as torn down', async () => {
   await assert.rejects(mount, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
 });
 
+test('teardown aborts an in-flight mount before tearing down the guest', async () => {
+  const fake = fakeSdk();
+  let mountSignal;
+  const cleanupOrder = [];
+  fake.instance.mount = (_tree, { signal }) => new Promise((_resolve, reject) => {
+    mountSignal = signal;
+    signal.addEventListener('abort', () => {
+      cleanupOrder.push('mount-aborted');
+      reject(signal.reason);
+    }, { once: true });
+  });
+  fake.instance.teardown = () => {
+    cleanupOrder.push('guest-torn-down');
+    fake.calls.teardown++;
+  };
+  const runtime = createVivariRuntime({ id: 'abort-pending-mount', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const mount = runtime.mount({ 'app.js': 'console.log("hello")' });
+  await new Promise(setImmediate);
+  await runtime.teardown();
+  await assert.rejects(mount, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  assert.equal(mountSignal.aborted, true);
+  assert.equal(fake.calls.teardown, 1);
+  assert.deepEqual(cleanupOrder, ['mount-aborted', 'guest-torn-down']);
+});
+
+test('an already-aborted mount signal fails closed without calling a guest that ignores cancellation', async () => {
+  const fake = fakeSdk();
+  const controller = new AbortController();
+  const reason = new Error('caller cancelled mount');
+  controller.abort(reason);
+  const runtime = createVivariRuntime({ id: 'aborted-before-mount', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  await assert.rejects(runtime.mount({}, { signal: controller.signal }), (error) => error === reason);
+  assert.equal(fake.calls.mount, 0);
+});
+
+test('a caller-cancelled mount rejects even when the guest ignores its abort signal', async () => {
+  const fake = fakeSdk();
+  const controller = new AbortController();
+  const reason = new Error('caller cancelled mount');
+  let resolveMount;
+  fake.instance.mount = () => new Promise((resolve) => { resolveMount = resolve; });
+  const runtime = createVivariRuntime({ id: 'ignored-mount-abort', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const mount = runtime.mount({}, { signal: controller.signal });
+  await new Promise(setImmediate);
+  controller.abort(reason);
+  resolveMount();
+  await assert.rejects(mount, (error) => error === reason);
+});
+
 test('an export that resolves after teardown never exposes a stale filesystem snapshot', async () => {
   const fake = fakeSdk();
   let resolveExport;

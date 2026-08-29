@@ -56,6 +56,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   #processes = new Set<RuntimeProcess>();
   #detachPreview = new Set<() => void | PromiseLike<void>>();
   #detachEvents = new Set<() => void>();
+  #mountAbortControllers = new Set<AbortController>();
   #bootPromise: Promise<void> | undefined;
   #guestBootPromise: Promise<VivariLike> | undefined;
   #guestBootInFlight = false;
@@ -204,9 +205,26 @@ class NexariVivariRuntime implements BrowserRuntime {
   }
 
   async mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void> {
-    await this.#ready().mount(tree, options);
-    if (this.state !== 'ready') {
-      throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while a mount was in flight');
+    const instance = this.#ready();
+    if (options?.signal?.aborted) throw options.signal.reason;
+    const controller = new AbortController();
+    const abortForCaller = () => controller.abort(options?.signal?.reason);
+    options?.signal?.addEventListener('abort', abortForCaller, { once: true });
+    this.#mountAbortControllers.add(controller);
+    try {
+      await instance.mount(tree, { ...options, signal: controller.signal });
+      if (this.state !== 'ready') {
+        throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while a mount was in flight');
+      }
+      if (controller.signal.aborted) throw controller.signal.reason;
+    } catch (cause) {
+      if (this.state !== 'ready') {
+        throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while a mount was in flight', cause);
+      }
+      throw cause;
+    } finally {
+      options?.signal?.removeEventListener('abort', abortForCaller);
+      this.#mountAbortControllers.delete(controller);
     }
   }
 
@@ -313,6 +331,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   async #teardown(): Promise<void> {
     this.#lifecycle.beginTeardown();
     this.#bootAbortController?.abort();
+    for (const controller of this.#mountAbortControllers) controller.abort();
     if (this.#guestBootInFlight) await this.#bootPromise?.catch(() => undefined);
     let failure: unknown;
     const cleanUp = (operation: () => void | PromiseLike<void>) => {
