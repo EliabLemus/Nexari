@@ -231,6 +231,19 @@ test('a mount that resolves after teardown rejects as torn down', async () => {
   await assert.rejects(mount, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
 });
 
+test('an export that resolves after teardown never exposes a stale filesystem snapshot', async () => {
+  const fake = fakeSdk();
+  let resolveExport;
+  fake.instance.export = () => new Promise((resolve) => { resolveExport = resolve; });
+  const runtime = createVivariRuntime({ id: 'late-export-after-teardown', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const snapshot = runtime.export('/project');
+  await new Promise(setImmediate);
+  await runtime.teardown();
+  resolveExport({ files: [{ path: 'secret.txt', contents: new Uint8Array([1]) }], truncated: false });
+  await assert.rejects(snapshot, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+});
+
 test('forwards server readiness as a typed runtime event', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'c', isIsolated: () => true, loadSdk: fake.loader });

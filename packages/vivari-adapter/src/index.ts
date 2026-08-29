@@ -245,7 +245,11 @@ class NexariVivariRuntime implements BrowserRuntime {
   }
 
   async export(path?: string): Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }> {
-    return this.#ready().export(path);
+    const snapshot = await this.#ready().export(path);
+    if (this.state !== 'ready') {
+      throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while exporting a filesystem snapshot');
+    }
+    return snapshot;
   }
 
   async teardown(): Promise<void> {
