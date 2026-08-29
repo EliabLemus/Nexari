@@ -218,6 +218,19 @@ test('a process that resolves after teardown is killed and never returned to the
   assert.equal(kills, 1);
 });
 
+test('a mount that resolves after teardown rejects as torn down', async () => {
+  const fake = fakeSdk();
+  let resolveMount;
+  fake.instance.mount = () => new Promise((resolve) => { resolveMount = resolve; });
+  const runtime = createVivariRuntime({ id: 'late-mount-after-teardown', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const mount = runtime.mount({ 'app.js': 'console.log("hello")' });
+  await new Promise(setImmediate);
+  await runtime.teardown();
+  resolveMount();
+  await assert.rejects(mount, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+});
+
 test('forwards server readiness as a typed runtime event', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'c', isIsolated: () => true, loadSdk: fake.loader });

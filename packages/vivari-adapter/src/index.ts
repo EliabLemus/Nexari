@@ -176,6 +176,9 @@ class NexariVivariRuntime implements BrowserRuntime {
 
   async mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void> {
     await this.#ready().mount(tree, options);
+    if (this.state !== 'ready') {
+      throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while a mount was in flight');
+    }
   }
 
   async spawn(command: string, args: string[] = [], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess> {
