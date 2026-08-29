@@ -32,7 +32,6 @@ export default defineConfig({
   plugins: [serveNexariServiceWorker()],
   resolve: { alias: {
     '@nexari/vivari-adapter': fileURLToPath(new URL('../../packages/vivari-adapter/src/index.ts', import.meta.url)),
-    '@vivari/core': fileURLToPath(new URL('../../runtime/vivari/packages/core/src/index.ts', import.meta.url)),
   } },
   server: { headers: isolation, fs: { allow: [fileURLToPath(new URL('../../runtime/vivari', import.meta.url))] } },
   preview: { headers: isolation },

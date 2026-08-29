@@ -14,6 +14,13 @@ test('the adapter type-checks against the owned Vivari fork declarations', () =>
   });
 });
 
+test('the pinned adapter loader resolves the owned Vivari SDK at runtime', async () => {
+  const adapter = await import('../dist/index.js');
+  const sdk = await adapter.loadPinnedVivariSdk();
+
+  assert.equal(typeof sdk.boot, 'function');
+});
+
 test('the owned Vivari fork exposes the adapter seam at runtime', async () => {
   const { Vivari } = await import(coreEntrypoint.href);
   assert.equal(typeof Vivari.boot, 'function');

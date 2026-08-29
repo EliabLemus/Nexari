@@ -43,7 +43,7 @@ export function createVivariRuntime(options: VivariAdapterOptions): BrowserRunti
 
 /** The sole fork-specific import seam; host applications only call the adapter API. */
 export async function loadPinnedVivariSdk(): Promise<VivariSdk> {
-  const { Vivari } = await import('@vivari/core');
+  const { Vivari } = await import('../../../runtime/vivari/packages/core/dist/index.js');
   return { boot: (options) => Vivari.boot(options) };
 }
 
