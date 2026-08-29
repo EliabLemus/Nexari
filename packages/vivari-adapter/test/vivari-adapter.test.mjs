@@ -79,6 +79,24 @@ test('a caller abort during SDK loading prevents a late SDK from booting a guest
   assert.equal(runtime.state, 'terminated');
 });
 
+test('a caller abort during SDK loading remains BOOT_ABORTED when the loader later rejects', async () => {
+  let rejectSdk;
+  const controller = new AbortController();
+  const runtime = createVivariRuntime({
+    id: 'aborted-sdk-load-rejection',
+    isIsolated: () => true,
+    loadSdk: () => new Promise((_resolve, reject) => { rejectSdk = reject; }),
+  });
+  const boot = runtime.boot({ signal: controller.signal });
+  await new Promise(setImmediate);
+  controller.abort(new Error('caller cancelled boot'));
+  rejectSdk(new Error('SDK loader failed after cancellation'));
+  await assert.rejects(boot, (error) => error instanceof RuntimeError
+    && error.code === 'BOOT_ABORTED'
+    && error.cause?.message === 'SDK loader failed after cancellation');
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('a caller abort during guest boot tears down a guest that ignores its abort signal', async () => {
   const fake = fakeSdk();
   const controller = new AbortController();
