@@ -297,6 +297,25 @@ test('teardown retries owned guest cleanup after a prior teardown failure', asyn
   assert.equal(runtime.state, 'terminated');
 });
 
+test('teardown retries a failed runtime event unsubscribe', async () => {
+  const fake = fakeSdk();
+  let unsubscribeAttempts = 0;
+  fake.instance.on = () => () => {
+    unsubscribeAttempts++;
+    if (unsubscribeAttempts === 1) throw new Error('event unsubscribe failed once');
+    fake.calls.unsubscribe++;
+  };
+  const runtime = createVivariRuntime({ id: 'retry-failed-event-unsubscribe', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  runtime.on('server-ready', () => {});
+  await assert.rejects(runtime.teardown(), /event unsubscribe failed once/);
+  await runtime.teardown();
+  assert.equal(unsubscribeAttempts, 2);
+  assert.equal(fake.calls.unsubscribe, 1);
+  assert.equal(fake.calls.teardown, 2);
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('teardown waits for asynchronous preview detachment before terminating the guest', async () => {
   const fake = fakeSdk();
   let releasePreviewDetach;
