@@ -90,8 +90,18 @@ class NexariVivariRuntime implements BrowserRuntime {
         }
         return entries;
       },
-      mkdir: (path, options) => this.#ready().fs.mkdir(path, options),
-      rm: (path, options) => this.#ready().fs.rm(path, options),
+      mkdir: async (path, options) => {
+        await this.#ready().fs.mkdir(path, options);
+        if (this.state !== 'ready') {
+          throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while creating a directory');
+        }
+      },
+      rm: async (path, options) => {
+        await this.#ready().fs.rm(path, options);
+        if (this.state !== 'ready') {
+          throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while removing a path');
+        }
+      },
     };
   }
 

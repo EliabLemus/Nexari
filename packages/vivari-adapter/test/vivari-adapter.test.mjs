@@ -283,6 +283,32 @@ test('a readdir that resolves after teardown never exposes a stale guest directo
   await assert.rejects(listing, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
 });
 
+test('a mkdir that resolves after teardown never reports success for a torn-down guest', async () => {
+  const fake = fakeSdk();
+  let resolveMkdir;
+  fake.instance.fs.mkdir = () => new Promise((resolve) => { resolveMkdir = resolve; });
+  const runtime = createVivariRuntime({ id: 'late-mkdir-after-teardown', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const mkdir = runtime.fs.mkdir('secret-dir', { recursive: true });
+  await new Promise(setImmediate);
+  await runtime.teardown();
+  resolveMkdir();
+  await assert.rejects(mkdir, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+});
+
+test('an rm that resolves after teardown never reports success for a torn-down guest', async () => {
+  const fake = fakeSdk();
+  let resolveRm;
+  fake.instance.fs.rm = () => new Promise((resolve) => { resolveRm = resolve; });
+  const runtime = createVivariRuntime({ id: 'late-rm-after-teardown', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const rm = runtime.fs.rm('secret-dir', { recursive: true, force: true });
+  await new Promise(setImmediate);
+  await runtime.teardown();
+  resolveRm();
+  await assert.rejects(rm, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+});
+
 test('forwards server readiness as a typed runtime event', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'c', isIsolated: () => true, loadSdk: fake.loader });
