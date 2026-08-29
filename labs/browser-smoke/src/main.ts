@@ -43,6 +43,7 @@ async function main() {
     } catch (error) {
       status.dataset.state = 'failed';
       status.textContent = `Runtime teardown failed: ${error instanceof Error ? error.message : String(error)}`;
+      teardownButton.disabled = false;
       return;
     } finally {
       preview.removeAttribute('src');
@@ -50,7 +51,7 @@ async function main() {
     }
     status.dataset.state = 'terminated';
     status.textContent = 'Runtime terminated; preview detached';
-  }, { once: true });
+  });
 }
 
 main().catch((error) => {

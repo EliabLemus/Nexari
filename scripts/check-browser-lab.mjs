@@ -19,6 +19,12 @@ if (!source.includes("await runtime.teardown();") || !source.includes("finally {
 if (!source.includes("catch (error) {\n      status.dataset.state = 'failed';\n      status.textContent = `Runtime teardown failed: ${error instanceof Error ? error.message : String(error)}`;")) {
   throw new Error('browser lab must report teardown failure after clearing the preview rather than leaving a stale ready state');
 }
+if (!source.includes("teardownButton.disabled = false;\n      return;")) {
+  throw new Error('browser lab must re-enable teardown after cleanup failure so adapter-owned cleanup can be retried');
+}
+if (source.includes("}, { once: true });")) {
+  throw new Error('browser lab must not discard its teardown handler after a failed cleanup retry path');
+}
 const adapter = await readFile(path.join(root, 'packages', 'vivari-adapter', 'src', 'index.ts'), 'utf8');
 for (const needle of ["import('@vivari/core')", 'Vivari.boot', 'server-ready']) {
   if (!adapter.includes(needle)) throw new Error(`adapter must own the Vivari SDK seam for ${needle}`);
