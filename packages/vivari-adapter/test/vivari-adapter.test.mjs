@@ -239,6 +239,31 @@ test('teardown during a pending boot tears down the late guest instead of leakin
   assert.equal(runtime.state, 'terminated');
 });
 
+test('a failed late guest cleanup during teardown remains owned for a retry', async () => {
+  const fake = fakeSdk();
+  let resolveBoot;
+  let cleanupAttempts = 0;
+  fake.instance.teardown = () => {
+    cleanupAttempts++;
+    fake.calls.teardown++;
+    if (cleanupAttempts === 1) throw new Error('late guest cleanup failed once');
+  };
+  const runtime = createVivariRuntime({
+    id: 'late-guest-teardown-retry',
+    isIsolated: () => true,
+    loadSdk: async () => ({ boot: () => new Promise((resolve) => { resolveBoot = resolve; }) }),
+  });
+  const boot = runtime.boot();
+  await Promise.resolve();
+  const teardown = runtime.teardown();
+  resolveBoot(fake.instance);
+  await assert.rejects(teardown, /late guest cleanup failed once/);
+  await assert.rejects(boot, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  await runtime.teardown();
+  assert.equal(cleanupAttempts, 2);
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('teardown waits for asynchronous cleanup of a guest that boots late', async () => {
   const fake = fakeSdk();
   let resolveBoot;

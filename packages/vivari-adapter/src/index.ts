@@ -109,6 +109,21 @@ class NexariVivariRuntime implements BrowserRuntime {
       } finally {
         this.#guestBootInFlight = false;
       }
+      if (this.state !== 'booting') {
+        if (this.state === 'tearing_down') {
+          // The active teardown owns the late guest, including failure reporting and retries.
+          this.#instance = instance;
+          throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while Vivari was booting');
+        }
+        try {
+          await instance.teardown();
+        } catch (cleanupFailure) {
+          this.#instance = instance;
+          this.#teardownFailed = true;
+          throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while Vivari was booting', cleanupFailure);
+        }
+        throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while Vivari was booting');
+      }
       if (abortController.signal.aborted) {
         let cleanupFailure: unknown;
         try {
@@ -124,10 +139,6 @@ class NexariVivariRuntime implements BrowserRuntime {
           this.#teardownFailed = true;
         }
         throw new RuntimeError('BOOT_ABORTED', 'Runtime boot was cancelled while Vivari was booting', cleanupFailure);
-      }
-      if (this.state !== 'booting') {
-        await instance.teardown();
-        throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while Vivari was booting');
       }
       this.#instance = instance;
       this.#lifecycle.markReady();
