@@ -1,0 +1,88 @@
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+
+const cdpUrl = process.env.NEXARI_CHROME_CDP_URL;
+if (!cdpUrl) {
+  throw new Error('NEXARI_CHROME_CDP_URL is required; provide an explicitly approved isolated Chrome DevTools endpoint.');
+}
+
+const labUrl = 'http://127.0.0.1:4174';
+const preview = spawn('npm', ['run', 'preview', '--', '--port', '4174'], {
+  cwd: new URL('../labs/browser-smoke/', import.meta.url),
+  stdio: ['ignore', 'pipe', 'pipe'],
+});
+let previewOutput = '';
+preview.stdout.on('data', (chunk) => { previewOutput += chunk; });
+preview.stderr.on('data', (chunk) => { previewOutput += chunk; });
+
+try {
+  await waitFor(() => fetch(labUrl).then((response) => response.ok));
+  const version = await (await fetch(`${cdpUrl}/json/version`)).json();
+  const browser = new WebSocket(version.webSocketDebuggerUrl);
+  await once(browser, 'open');
+  let nextId = 0;
+  const pending = new Map();
+  browser.addEventListener('message', ({ data }) => {
+    const message = JSON.parse(data);
+    const request = pending.get(message.id);
+    if (!request) return;
+    pending.delete(message.id);
+    message.error ? request.reject(new Error(message.error.message)) : request.resolve(message.result);
+  });
+  const command = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
+    const id = ++nextId;
+    pending.set(id, { resolve, reject });
+    browser.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
+  });
+
+  const { targetId } = await command('Target.createTarget', { url: 'about:blank' });
+  const { sessionId } = await command('Target.attachToTarget', { targetId, flatten: true });
+  const sessionCommand = (method, params = {}) => command(method, params, sessionId);
+  const evaluate = async (expression, awaitPromise = false) => {
+    const result = await sessionCommand('Runtime.evaluate', { expression, awaitPromise, returnByValue: true });
+    if (result.exceptionDetails) throw new Error(result.exceptionDetails.text);
+    return result.result.value;
+  };
+
+  await sessionCommand('Page.enable');
+  await sessionCommand('Page.navigate', { url: labUrl });
+  const ready = await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.state === 'ready'`), 120_000);
+  assert.equal(ready, true, `browser lab never reached server-ready state:\n${previewOutput}`);
+  assert.equal(await evaluate('crossOriginIsolated'), true, 'guest runtime must start only in an isolated browser context');
+  const resourceOrigins = await evaluate(`Array.from(new Set(performance.getEntriesByType('resource').map(({ name }) => new URL(name).origin)))`);
+  assert.deepEqual(resourceOrigins, [new URL(labUrl).origin], 'browser runtime assets must load only from the controlled lab origin');
+  assert.equal(await evaluate(`document.querySelector('#preview')?.hidden`), false, 'preview must be visible only after server-ready');
+  assert.match(await evaluate(`document.querySelector('#preview')?.src`), /^http:\/\//, 'preview must have a runtime URL');
+
+  await evaluate(`document.querySelector('#teardown')?.click()`);
+  const terminated = await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.state === 'terminated'`));
+  assert.equal(terminated, true, 'teardown must reach the terminated state');
+  assert.equal(await evaluate(`document.querySelector('#preview')?.hasAttribute('src')`), false, 'teardown must clear the preview URL');
+  assert.equal(await evaluate(`document.querySelector('#preview')?.hidden`), true, 'teardown must hide the preview');
+
+  await command('Target.closeTarget', { targetId });
+  browser.close();
+  console.log('browser lab E2E: PASS (ready server preview followed by safe teardown)');
+} finally {
+  preview.kill('SIGTERM');
+}
+
+async function waitFor(check, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      if (await check()) return true;
+    } catch {
+      // The local preview server and browser target start asynchronously.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return false;
+}
+
+function once(target, event) {
+  return new Promise((resolve, reject) => {
+    target.addEventListener(event, resolve, { once: true });
+    target.addEventListener('error', () => reject(new Error(`CDP socket error while waiting for ${event}`)), { once: true });
+  });
+}
