@@ -40,6 +40,10 @@ async function main() {
     teardownButton.disabled = true;
     try {
       await runtime.teardown();
+    } catch (error) {
+      status.dataset.state = 'failed';
+      status.textContent = `Runtime teardown failed: ${error instanceof Error ? error.message : String(error)}`;
+      return;
     } finally {
       preview.removeAttribute('src');
       preview.hidden = true;
