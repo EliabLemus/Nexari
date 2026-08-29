@@ -8,13 +8,17 @@ const stream = new ReadableStream({ start(controller) { controller.close(); } })
 
 function fakeSdk() {
   const calls = { boot: 0, mount: 0, spawn: 0, teardown: 0, detach: 0, unsubscribe: 0 };
-  let serverReady;
+  const listeners = new Map();
   const instance = {
     fs: { readFile: async () => 'ok', writeFile: async () => {}, readdir: async () => [], mkdir: async () => {}, rm: async () => {} },
     mount: async () => { calls.mount++; },
     spawn: async () => { calls.spawn++; return { pid: 41, output: stream, stdout: stream, stderr: stream, input: new WritableStream(), exit: Promise.resolve(0), kill() {} }; },
-    on: (_event, listener) => { serverReady = listener; return () => { calls.unsubscribe++; serverReady = undefined; }; },
-    emitServerReady: (...args) => serverReady?.(...args),
+    on: (event, listener) => {
+      listeners.set(event, listener);
+      return () => { calls.unsubscribe++; listeners.delete(event); };
+    },
+    emitServerReady: (...args) => listeners.get('server-ready')?.(...args),
+    emitPort: (...args) => listeners.get('port')?.(...args),
     attachPreview: () => () => { calls.detach++; },
     export: async () => ({ files: [], truncated: false }),
     teardown: () => { calls.teardown++; },
@@ -348,6 +352,32 @@ test('teardown unsubscribes runtime event listeners so stale server events canno
   runtime.on('server-ready', () => { received++; });
   await runtime.teardown();
   fake.instance.emitServerReady(3111, 'http://stale.test/');
+  assert.equal(fake.calls.unsubscribe, 1);
+  assert.equal(received, 0);
+});
+
+test('forwards raw port state as a typed runtime event', async () => {
+  const fake = fakeSdk();
+  const runtime = createVivariRuntime({ id: 'port-events', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const received = [];
+  runtime.on('port', (...event) => { received.push(event); });
+  fake.instance.emitPort(3111, 'open', 'http://preview.test/3111');
+  fake.instance.emitPort(3111, 'close', 'http://preview.test/3111');
+  assert.deepEqual(received, [
+    [3111, 'open', 'http://preview.test/3111'],
+    [3111, 'close', 'http://preview.test/3111'],
+  ]);
+});
+
+test('teardown unsubscribes port listeners so stale port state cannot reach the host', async () => {
+  const fake = fakeSdk();
+  const runtime = createVivariRuntime({ id: 'stale-port-events', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  let received = 0;
+  runtime.on('port', () => { received++; });
+  await runtime.teardown();
+  fake.instance.emitPort(3111, 'open', 'http://stale.test/3111');
   assert.equal(fake.calls.unsubscribe, 1);
   assert.equal(received, 0);
 });

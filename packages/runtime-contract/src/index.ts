@@ -27,6 +27,7 @@ export interface RuntimeProcess {
 
 export type RuntimeEventMap = {
   'server-ready': [port: number, url: string];
+  'port': [port: number, kind: 'open' | 'close', url: string];
 };
 
 export interface BrowserRuntime {

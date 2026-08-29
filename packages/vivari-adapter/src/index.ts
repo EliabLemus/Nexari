@@ -23,6 +23,7 @@ export interface VivariLike {
   spawn(command: string, args?: string[], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess>;
   attachPreview(iframe: HTMLIFrameElement): () => void | PromiseLike<void>;
   on(event: 'server-ready', listener: (port: number, url: string) => void): () => void;
+  on(event: 'port', listener: (port: number, kind: 'open' | 'close', url: string) => void): () => void;
   export(path?: string): Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>;
   teardown(): void | Promise<void>;
 }
@@ -261,11 +262,20 @@ class NexariVivariRuntime implements BrowserRuntime {
   }
 
   on<E extends keyof RuntimeEventMap>(event: E, listener: (...args: RuntimeEventMap[E]) => void): () => void {
-    if (event !== 'server-ready') throw new RuntimeError('UNSUPPORTED_CAPABILITY', `Unsupported event ${String(event)}`);
-    const forwardIfReady = (port: number, url: string) => {
-      if (this.state === 'ready') (listener as (port: number, url: string) => void)(port, url);
-    };
-    const detach = this.#ready().on('server-ready', forwardIfReady);
+    let detach: () => void;
+    if (event === 'server-ready') {
+      const forwardIfReady = (port: number, url: string) => {
+        if (this.state === 'ready') (listener as (port: number, url: string) => void)(port, url);
+      };
+      detach = this.#ready().on('server-ready', forwardIfReady);
+    } else if (event === 'port') {
+      const forwardIfReady = (port: number, kind: 'open' | 'close', url: string) => {
+        if (this.state === 'ready') (listener as unknown as (port: number, kind: 'open' | 'close', url: string) => void)(port, kind, url);
+      };
+      detach = this.#ready().on('port', forwardIfReady);
+    } else {
+      throw new RuntimeError('UNSUPPORTED_CAPABILITY', `Unsupported event ${String(event)}`);
+    }
     let active = true;
     const ownedDetach = () => {
       if (!active) return;
