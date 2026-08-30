@@ -66,6 +66,11 @@ try {
     'write-read-readdir-rm-readdir',
     'the owned Vivari filesystem bridge must complete a text CRUD round-trip before the server starts',
   );
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.fsBinaryProof`),
+    'write-bytes-read-bytes-rm',
+    'the owned Vivari filesystem bridge must round-trip binary payloads byte-for-byte before the server starts',
+  );
 
   await evaluate(`(() => {
     const preview = document.querySelector('#preview');

@@ -37,6 +37,17 @@ async function main() {
     throw new Error('Vivari filesystem CRUD proof failed');
   }
   status.dataset.fsProof = 'write-read-readdir-rm-readdir';
+  const fsBinaryProofPath = '/nexari-fs-proof.bin';
+  const fsBinaryPayload = new Uint8Array([0, 1, 127, 128, 254, 255]);
+  await runtime.fs.writeFile(fsBinaryProofPath, fsBinaryPayload);
+  const fsBinaryReadBack = await runtime.fs.readFile(fsBinaryProofPath);
+  await runtime.fs.rm(fsBinaryProofPath);
+  if (!(fsBinaryReadBack instanceof Uint8Array)
+    || fsBinaryReadBack.length !== fsBinaryPayload.length
+    || fsBinaryReadBack.some((byte, index) => byte !== fsBinaryPayload[index])) {
+    throw new Error('Vivari binary filesystem proof failed');
+  }
+  status.dataset.fsBinaryProof = 'write-bytes-read-bytes-rm';
   runtime.on('server-ready', (port, url) => {
     preview.src = url;
     preview.hidden = false;
