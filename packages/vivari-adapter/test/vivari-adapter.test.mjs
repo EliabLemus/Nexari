@@ -618,9 +618,30 @@ test('a mkdir that resolves after teardown never reports success for a torn-down
   await runtime.boot();
   const mkdir = runtime.fs.mkdir('secret-dir', { recursive: true });
   await new Promise(setImmediate);
-  await runtime.teardown();
+  const teardown = runtime.teardown();
   resolveMkdir();
   await assert.rejects(mkdir, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  await teardown;
+});
+
+test('teardown waits for an in-flight mkdir before tearing down the guest', async () => {
+  const fake = fakeSdk();
+  let resolveMkdir;
+  fake.instance.fs.mkdir = () => new Promise((resolve) => { resolveMkdir = resolve; });
+  const runtime = createVivariRuntime({ id: 'wait-for-in-flight-mkdir', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const mkdir = runtime.fs.mkdir('secret-dir', { recursive: true });
+  await new Promise(setImmediate);
+  let teardownSettled = false;
+  const teardown = runtime.teardown().then(() => { teardownSettled = true; });
+  await new Promise(setImmediate);
+  assert.equal(teardownSettled, false, 'teardown must wait for the in-flight mkdir');
+  assert.equal(fake.calls.teardown, 0, 'guest must not be torn down while mkdir is in flight');
+  resolveMkdir();
+  await assert.rejects(mkdir, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  await teardown;
+  assert.equal(fake.calls.teardown, 1);
+  assert.equal(runtime.state, 'terminated');
 });
 
 test('an rm that resolves after teardown never reports success for a torn-down guest', async () => {

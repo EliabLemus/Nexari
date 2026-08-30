@@ -62,6 +62,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   #readFilePromises = new Set<Promise<unknown>>();
   #readdirPromises = new Set<Promise<string[]>>();
   #writeFilePromises = new Set<Promise<void>>();
+  #mkdirPromises = new Set<Promise<void>>();
   #exportPromises = new Set<Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>>();
   #bootPromise: Promise<void> | undefined;
   #guestBootPromise: Promise<VivariLike> | undefined;
@@ -118,9 +119,15 @@ class NexariVivariRuntime implements BrowserRuntime {
         }
       },
       mkdir: async (path, options) => {
-        await this.#ready().fs.mkdir(path, options);
-        if (this.state !== 'ready') {
-          throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while creating a directory');
+        const mkdirPromise = this.#ready().fs.mkdir(path, options);
+        this.#mkdirPromises.add(mkdirPromise);
+        try {
+          await mkdirPromise;
+          if (this.state !== 'ready') {
+            throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while creating a directory');
+          }
+        } finally {
+          this.#mkdirPromises.delete(mkdirPromise);
         }
       },
       rm: async (path, options) => {
@@ -382,6 +389,7 @@ class NexariVivariRuntime implements BrowserRuntime {
     if (this.#readFilePromises.size > 0) await Promise.allSettled([...this.#readFilePromises]);
     if (this.#readdirPromises.size > 0) await Promise.allSettled([...this.#readdirPromises]);
     if (this.#writeFilePromises.size > 0) await Promise.allSettled([...this.#writeFilePromises]);
+    if (this.#mkdirPromises.size > 0) await Promise.allSettled([...this.#mkdirPromises]);
     if (this.#exportPromises.size > 0) await Promise.allSettled([...this.#exportPromises]);
     if (this.#guestBootInFlight) await this.#bootPromise?.catch(() => undefined);
     let failure: unknown;
