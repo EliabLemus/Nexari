@@ -57,6 +57,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   #detachPreview = new Set<() => void | PromiseLike<void>>();
   #detachEvents = new Set<() => void>();
   #mountAbortControllers = new Set<AbortController>();
+  #mountPromises = new Set<Promise<void>>();
   #bootPromise: Promise<void> | undefined;
   #guestBootPromise: Promise<VivariLike> | undefined;
   #guestBootInFlight = false;
@@ -211,8 +212,10 @@ class NexariVivariRuntime implements BrowserRuntime {
     const abortForCaller = () => controller.abort(options?.signal?.reason);
     options?.signal?.addEventListener('abort', abortForCaller, { once: true });
     this.#mountAbortControllers.add(controller);
+    const mountPromise = instance.mount(tree, { ...options, signal: controller.signal });
+    this.#mountPromises.add(mountPromise);
     try {
-      await instance.mount(tree, { ...options, signal: controller.signal });
+      await mountPromise;
       if (this.state !== 'ready') {
         throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while a mount was in flight');
       }
@@ -225,6 +228,7 @@ class NexariVivariRuntime implements BrowserRuntime {
     } finally {
       options?.signal?.removeEventListener('abort', abortForCaller);
       this.#mountAbortControllers.delete(controller);
+      this.#mountPromises.delete(mountPromise);
     }
   }
 
@@ -337,6 +341,7 @@ class NexariVivariRuntime implements BrowserRuntime {
     this.#lifecycle.beginTeardown();
     this.#bootAbortController?.abort();
     for (const controller of this.#mountAbortControllers) controller.abort();
+    if (this.#mountPromises.size > 0) await Promise.allSettled([...this.#mountPromises]);
     if (this.#guestBootInFlight) await this.#bootPromise?.catch(() => undefined);
     let failure: unknown;
     const cleanUp = (operation: () => void | PromiseLike<void>) => {

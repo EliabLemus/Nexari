@@ -346,8 +346,10 @@ test('a mount that resolves after teardown rejects as torn down', async () => {
   await runtime.boot();
   const mount = runtime.mount({ 'app.js': 'console.log("hello")' });
   await new Promise(setImmediate);
-  await runtime.teardown();
+  const teardown = runtime.teardown();
+  await new Promise(setImmediate);
   resolveMount();
+  await teardown;
   await assert.rejects(mount, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
 });
 
@@ -370,11 +372,39 @@ test('teardown aborts an in-flight mount before tearing down the guest', async (
   await runtime.boot();
   const mount = runtime.mount({ 'app.js': 'console.log("hello")' });
   await new Promise(setImmediate);
-  await runtime.teardown();
-  await assert.rejects(mount, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  const mountRejected = assert.rejects(mount, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  const teardown = runtime.teardown();
+  await new Promise(setImmediate);
   assert.equal(mountSignal.aborted, true);
+  await teardown;
+  await mountRejected;
   assert.equal(fake.calls.teardown, 1);
   assert.deepEqual(cleanupOrder, ['mount-aborted', 'guest-torn-down']);
+});
+
+test('teardown waits for an abort-ignoring mount to settle before tearing down the guest', async () => {
+  const fake = fakeSdk();
+  let resolveMount;
+  let mountSignal;
+  fake.instance.mount = (_tree, { signal }) => {
+    mountSignal = signal;
+    return new Promise((resolve) => { resolveMount = resolve; });
+  };
+  const runtime = createVivariRuntime({ id: 'wait-for-ignored-mount-abort', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const mount = runtime.mount({ 'app.js': 'console.log("hello")' });
+  await new Promise(setImmediate);
+  let teardownSettled = false;
+  const teardown = runtime.teardown().then(() => { teardownSettled = true; });
+  await new Promise(setImmediate);
+  assert.equal(mountSignal.aborted, true);
+  assert.equal(teardownSettled, false);
+  assert.equal(fake.calls.teardown, 0);
+  resolveMount();
+  await assert.rejects(mount, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  await teardown;
+  assert.equal(fake.calls.teardown, 1);
+  assert.equal(runtime.state, 'terminated');
 });
 
 test('an already-aborted mount signal fails closed without calling a guest that ignores cancellation', async () => {
