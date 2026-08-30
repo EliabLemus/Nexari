@@ -652,9 +652,30 @@ test('an rm that resolves after teardown never reports success for a torn-down g
   await runtime.boot();
   const rm = runtime.fs.rm('secret-dir', { recursive: true, force: true });
   await new Promise(setImmediate);
-  await runtime.teardown();
+  const teardown = runtime.teardown();
   resolveRm();
   await assert.rejects(rm, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  await teardown;
+});
+
+test('teardown waits for an in-flight rm before tearing down the guest', async () => {
+  const fake = fakeSdk();
+  let resolveRm;
+  fake.instance.fs.rm = () => new Promise((resolve) => { resolveRm = resolve; });
+  const runtime = createVivariRuntime({ id: 'wait-for-in-flight-rm', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const rm = runtime.fs.rm('secret-dir', { recursive: true, force: true });
+  await new Promise(setImmediate);
+  let teardownSettled = false;
+  const teardown = runtime.teardown().then(() => { teardownSettled = true; });
+  await new Promise(setImmediate);
+  assert.equal(teardownSettled, false, 'teardown must wait for the in-flight rm');
+  assert.equal(fake.calls.teardown, 0, 'guest must not be torn down while rm is in flight');
+  resolveRm();
+  await assert.rejects(rm, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  await teardown;
+  assert.equal(fake.calls.teardown, 1);
+  assert.equal(runtime.state, 'terminated');
 });
 
 test('forwards server readiness as a typed runtime event', async () => {
