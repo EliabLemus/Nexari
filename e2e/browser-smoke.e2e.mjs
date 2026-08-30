@@ -71,6 +71,11 @@ try {
     'write-bytes-read-bytes-rm',
     'the owned Vivari filesystem bridge must round-trip binary payloads byte-for-byte before the server starts',
   );
+  assert.match(
+    await evaluate(`document.querySelector('#status')?.dataset.portOpen`),
+    /^3111:\/preview\/3111\/$/,
+    'the owned Vivari port-open event must reach the host with its controlled-origin preview path',
+  );
 
   await evaluate(`(() => {
     const preview = document.querySelector('#preview');

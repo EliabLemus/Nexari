@@ -48,6 +48,9 @@ async function main() {
     throw new Error('Vivari binary filesystem proof failed');
   }
   status.dataset.fsBinaryProof = 'write-bytes-read-bytes-rm';
+  runtime.on('port', (port, kind, url) => {
+    if (kind === 'open' && port === 3111) status.dataset.portOpen = `${port}:${url}`;
+  });
   runtime.on('server-ready', (port, url) => {
     preview.src = url;
     preview.hidden = false;
