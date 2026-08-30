@@ -128,6 +128,19 @@ test('a caller abort during SDK loading remains BOOT_ABORTED when the loader lat
   assert.equal(runtime.state, 'terminated');
 });
 
+test('a failed guest boot preserves its cause and terminates the lifecycle', async () => {
+  const guestError = new Error('kernel boot panic');
+  const runtime = createVivariRuntime({
+    id: 'guest-boot-failure',
+    isIsolated: () => true,
+    loadSdk: async () => ({ boot: async () => { throw guestError; } }),
+  });
+  await assert.rejects(runtime.boot(), (error) => error instanceof RuntimeError
+    && error.code === 'BOOT_FAILED'
+    && error.cause === guestError);
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('a caller abort during guest boot tears down a guest that ignores its abort signal', async () => {
   const fake = fakeSdk();
   const controller = new AbortController();

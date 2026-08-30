@@ -198,7 +198,7 @@ class NexariVivariRuntime implements BrowserRuntime {
         this.#lifecycle.markTerminated();
       }
       if (cause instanceof RuntimeError) throw cause;
-      throw new RuntimeError('BOOT_FAILED', cause instanceof Error ? cause.message : 'Vivari boot failed');
+      throw new RuntimeError('BOOT_FAILED', cause instanceof Error ? cause.message : 'Vivari boot failed', cause);
     } finally {
       signal?.removeEventListener('abort', forwardAbort);
       if (this.#bootAbortController === abortController) this.#bootAbortController = undefined;
