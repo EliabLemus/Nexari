@@ -57,6 +57,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   #detachPreview = new Set<() => void | PromiseLike<void>>();
   #detachEvents = new Set<() => void>();
   #mountAbortControllers = new Set<AbortController>();
+  #spawnAbortControllers = new Set<AbortController>();
   #mountPromises = new Set<Promise<void>>();
   #spawnPromises = new Set<Promise<RuntimeProcess>>();
   #readFilePromises = new Set<Promise<unknown>>();
@@ -273,15 +274,21 @@ class NexariVivariRuntime implements BrowserRuntime {
     try {
       const instance = this.#ready();
       if (options?.signal?.aborted) throw options.signal.reason;
-      const spawnPromise = instance.spawn(command, args, options);
+      const controller = new AbortController();
+      const abortForCaller = () => controller.abort(options?.signal?.reason);
+      options?.signal?.addEventListener('abort', abortForCaller, { once: true });
+      this.#spawnAbortControllers.add(controller);
+      const spawnPromise = instance.spawn(command, args, { ...options, signal: controller.signal });
       this.#spawnPromises.add(spawnPromise);
       let process: RuntimeProcess;
       try {
         process = await spawnPromise;
       } finally {
+        options?.signal?.removeEventListener('abort', abortForCaller);
+        this.#spawnAbortControllers.delete(controller);
         this.#spawnPromises.delete(spawnPromise);
       }
-      if (this.state !== 'ready' || options?.signal?.aborted) {
+      if (this.state !== 'ready' || controller.signal.aborted) {
         try {
           process.kill();
         } catch {
@@ -290,7 +297,7 @@ class NexariVivariRuntime implements BrowserRuntime {
         if (this.state !== 'ready') {
           throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while a process was starting');
         }
-        throw options?.signal?.reason;
+        throw controller.signal.reason;
       }
       this.#processes.add(process);
       void process.exit.then(
@@ -391,6 +398,7 @@ class NexariVivariRuntime implements BrowserRuntime {
     this.#lifecycle.beginTeardown();
     this.#bootAbortController?.abort();
     for (const controller of this.#mountAbortControllers) controller.abort();
+    for (const controller of this.#spawnAbortControllers) controller.abort();
     if (this.#mountPromises.size > 0) await Promise.allSettled([...this.#mountPromises]);
     if (this.#spawnPromises.size > 0) await Promise.allSettled([...this.#spawnPromises]);
     if (this.#readFilePromises.size > 0) await Promise.allSettled([...this.#readFilePromises]);

@@ -288,6 +288,37 @@ test('a process that resolves after teardown is killed and never returned to the
   assert.equal(fake.calls.teardown, 1);
 });
 
+test('teardown aborts an in-flight spawn before waiting for an abort-ignoring guest', async () => {
+  const fake = fakeSdk();
+  let resolveSpawn;
+  let spawnSignal;
+  const lateProcess = {
+    pid: 142,
+    output: stream,
+    stdout: stream,
+    stderr: stream,
+    input: new WritableStream(),
+    exit: Promise.resolve(0),
+    kill() {},
+  };
+  fake.instance.spawn = (_command, _args, options) => {
+    spawnSignal = options?.signal;
+    return new Promise((resolve) => { resolveSpawn = resolve; });
+  };
+  const runtime = createVivariRuntime({ id: 'abort-pending-spawn', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const spawn = runtime.spawn('node', ['server.js']);
+  await new Promise(setImmediate);
+  const teardown = runtime.teardown();
+  await new Promise(setImmediate);
+  assert.equal(spawnSignal?.aborted, true, 'teardown must abort the guest spawn before waiting for it');
+  assert.equal(fake.calls.teardown, 0, 'guest teardown must wait for the spawn to settle');
+  resolveSpawn(lateProcess);
+  await assert.rejects(spawn, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  await teardown;
+  assert.equal(fake.calls.teardown, 1);
+});
+
 test('a caller-cancelled spawn kills a late process and never returns it to the host', async () => {
   const fake = fakeSdk();
   const controller = new AbortController();
