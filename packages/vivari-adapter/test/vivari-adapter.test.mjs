@@ -227,6 +227,24 @@ test('maps the owned fork and detaches previews on idempotent teardown', async (
   await assert.rejects(runtime.spawn('node'), (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
 });
 
+test('teardown clears an attached preview source so a stale document cannot outlive the runtime', async () => {
+  const fake = fakeSdk();
+  const preview = {
+    src: 'http://stale.test/preview/3111/',
+    hidden: false,
+    removeAttribute(name) {
+      if (name === 'src') this.src = '';
+    },
+  };
+  const runtime = createVivariRuntime({ id: 'clear-stale-preview-source', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  runtime.attachPreview(preview);
+  await runtime.teardown();
+  assert.equal(preview.src, '');
+  assert.equal(preview.hidden, true);
+  assert.equal(fake.calls.detach, 1);
+});
+
 test('teardown kills a process already returned to the host before tearing down the guest', async () => {
   const fake = fakeSdk();
   let kills = 0;

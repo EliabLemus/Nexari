@@ -54,11 +54,22 @@ try {
   assert.equal(await evaluate(`document.querySelector('#preview')?.hidden`), false, 'preview must be visible only after server-ready');
   assert.match(await evaluate(`document.querySelector('#preview')?.src`), /^http:\/\//, 'preview must have a runtime URL');
 
+  await evaluate(`(() => {
+    const preview = document.querySelector('#preview');
+    const removeAttribute = preview.removeAttribute.bind(preview);
+    let sourceClears = 0;
+    preview.removeAttribute = (name) => {
+      if (name === 'src') sourceClears++;
+      return removeAttribute(name);
+    };
+    window.__nexariPreviewSourceClears = () => sourceClears;
+  })()`);
   await evaluate(`document.querySelector('#teardown')?.click()`);
   const terminated = await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.state === 'terminated'`));
   assert.equal(terminated, true, 'teardown must reach the terminated state');
   assert.equal(await evaluate(`document.querySelector('#preview')?.hasAttribute('src')`), false, 'teardown must clear the preview URL');
   assert.equal(await evaluate(`document.querySelector('#preview')?.hidden`), true, 'teardown must hide the preview');
+  assert.equal(await evaluate(`window.__nexariPreviewSourceClears?.()`), 2, 'the adapter must clear the preview before the lab failure-safety fallback');
 
   await command('Target.closeTarget', { targetId });
   browser.close();

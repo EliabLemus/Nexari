@@ -318,6 +318,10 @@ class NexariVivariRuntime implements BrowserRuntime {
     const ownedDetach = (): void | PromiseLike<void> => {
       if (!active) return;
       if (pendingDetach) return pendingDetach;
+      // Detaching the relay alone leaves the old document alive in the iframe.
+      // Clear it before cleanup so a stale preview cannot outlive this runtime.
+      iframe.removeAttribute?.('src');
+      iframe.hidden = true;
       const result = detach();
       if (result && typeof (result as PromiseLike<void>).then === 'function') {
         pendingDetach = Promise.resolve(result).then(
