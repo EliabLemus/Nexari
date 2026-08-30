@@ -276,10 +276,16 @@ test('a process that resolves after teardown is killed and never returned to the
   await runtime.boot();
   const spawn = runtime.spawn('node', ['server.js']);
   await new Promise(setImmediate);
-  await runtime.teardown();
+  let teardownSettled = false;
+  const teardown = runtime.teardown().then(() => { teardownSettled = true; });
+  await new Promise(setImmediate);
+  assert.equal(teardownSettled, false);
+  assert.equal(fake.calls.teardown, 0);
   resolveSpawn(lateProcess);
   await assert.rejects(spawn, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
   assert.equal(kills, 1);
+  await teardown;
+  assert.equal(fake.calls.teardown, 1);
 });
 
 test('a caller-cancelled spawn kills a late process and never returns it to the host', async () => {
@@ -333,11 +339,12 @@ test('teardown takes precedence over caller cancellation for a late process', as
   await runtime.boot();
   const spawn = runtime.spawn('node', ['server.js'], { signal: controller.signal });
   await new Promise(setImmediate);
-  await runtime.teardown();
+  const teardown = runtime.teardown();
   controller.abort(callerReason);
   resolveSpawn(lateProcess);
   await assert.rejects(spawn, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
   assert.equal(kills, 1);
+  await teardown;
 });
 
 test('an already-aborted spawn signal fails closed before invoking the guest', async () => {

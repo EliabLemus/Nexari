@@ -58,6 +58,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   #detachEvents = new Set<() => void>();
   #mountAbortControllers = new Set<AbortController>();
   #mountPromises = new Set<Promise<void>>();
+  #spawnPromises = new Set<Promise<RuntimeProcess>>();
   #readFilePromises = new Set<Promise<unknown>>();
   #writeFilePromises = new Set<Promise<void>>();
   #exportPromises = new Set<Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>>();
@@ -251,7 +252,14 @@ class NexariVivariRuntime implements BrowserRuntime {
     try {
       const instance = this.#ready();
       if (options?.signal?.aborted) throw options.signal.reason;
-      const process = await instance.spawn(command, args, options);
+      const spawnPromise = instance.spawn(command, args, options);
+      this.#spawnPromises.add(spawnPromise);
+      let process: RuntimeProcess;
+      try {
+        process = await spawnPromise;
+      } finally {
+        this.#spawnPromises.delete(spawnPromise);
+      }
       if (this.state !== 'ready' || options?.signal?.aborted) {
         try {
           process.kill();
@@ -363,6 +371,7 @@ class NexariVivariRuntime implements BrowserRuntime {
     this.#bootAbortController?.abort();
     for (const controller of this.#mountAbortControllers) controller.abort();
     if (this.#mountPromises.size > 0) await Promise.allSettled([...this.#mountPromises]);
+    if (this.#spawnPromises.size > 0) await Promise.allSettled([...this.#spawnPromises]);
     if (this.#readFilePromises.size > 0) await Promise.allSettled([...this.#readFilePromises]);
     if (this.#writeFilePromises.size > 0) await Promise.allSettled([...this.#writeFilePromises]);
     if (this.#exportPromises.size > 0) await Promise.allSettled([...this.#exportPromises]);
