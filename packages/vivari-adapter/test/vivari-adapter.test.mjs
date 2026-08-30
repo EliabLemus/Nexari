@@ -454,9 +454,30 @@ test('an export that resolves after teardown never exposes a stale filesystem sn
   await runtime.boot();
   const snapshot = runtime.export('/project');
   await new Promise(setImmediate);
-  await runtime.teardown();
+  const teardown = runtime.teardown();
   resolveExport({ files: [{ path: 'secret.txt', contents: new Uint8Array([1]) }], truncated: false });
   await assert.rejects(snapshot, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  await teardown;
+});
+
+test('teardown waits for an in-flight export before tearing down the guest', async () => {
+  const fake = fakeSdk();
+  let resolveExport;
+  fake.instance.export = () => new Promise((resolve) => { resolveExport = resolve; });
+  const runtime = createVivariRuntime({ id: 'wait-for-in-flight-export', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const snapshot = runtime.export('/project');
+  await new Promise(setImmediate);
+  let teardownSettled = false;
+  const teardown = runtime.teardown().then(() => { teardownSettled = true; });
+  await new Promise(setImmediate);
+  assert.equal(teardownSettled, false);
+  assert.equal(fake.calls.teardown, 0);
+  resolveExport({ files: [], truncated: false });
+  await assert.rejects(snapshot, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  await teardown;
+  assert.equal(fake.calls.teardown, 1);
+  assert.equal(runtime.state, 'terminated');
 });
 
 test('a readFile that resolves after teardown never exposes stale guest file data', async () => {

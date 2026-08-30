@@ -58,6 +58,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   #detachEvents = new Set<() => void>();
   #mountAbortControllers = new Set<AbortController>();
   #mountPromises = new Set<Promise<void>>();
+  #exportPromises = new Set<Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>>();
   #bootPromise: Promise<void> | undefined;
   #guestBootPromise: Promise<VivariLike> | undefined;
   #guestBootInFlight = false;
@@ -316,11 +317,17 @@ class NexariVivariRuntime implements BrowserRuntime {
   }
 
   async export(path?: string): Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }> {
-    const snapshot = await this.#ready().export(path);
-    if (this.state !== 'ready') {
-      throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while exporting a filesystem snapshot');
+    const exportPromise = this.#ready().export(path);
+    this.#exportPromises.add(exportPromise);
+    try {
+      const snapshot = await exportPromise;
+      if (this.state !== 'ready') {
+        throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while exporting a filesystem snapshot');
+      }
+      return snapshot;
+    } finally {
+      this.#exportPromises.delete(exportPromise);
     }
-    return snapshot;
   }
 
   async teardown(): Promise<void> {
@@ -342,6 +349,7 @@ class NexariVivariRuntime implements BrowserRuntime {
     this.#bootAbortController?.abort();
     for (const controller of this.#mountAbortControllers) controller.abort();
     if (this.#mountPromises.size > 0) await Promise.allSettled([...this.#mountPromises]);
+    if (this.#exportPromises.size > 0) await Promise.allSettled([...this.#exportPromises]);
     if (this.#guestBootInFlight) await this.#bootPromise?.catch(() => undefined);
     let failure: unknown;
     const cleanUp = (operation: () => void | PromiseLike<void>) => {
