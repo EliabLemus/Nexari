@@ -58,6 +58,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   #detachEvents = new Set<() => void>();
   #mountAbortControllers = new Set<AbortController>();
   #mountPromises = new Set<Promise<void>>();
+  #readFilePromises = new Set<Promise<unknown>>();
   #exportPromises = new Set<Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>>();
   #bootPromise: Promise<void> | undefined;
   #guestBootPromise: Promise<VivariLike> | undefined;
@@ -74,13 +75,19 @@ class NexariVivariRuntime implements BrowserRuntime {
     this.#loadSdk = loadSdk;
     this.fs = {
       readFile: async (path, encoding) => {
-        const contents = await (encoding
+        const readPromise = encoding
           ? this.#ready().fs.readFile(path, encoding)
-          : this.#ready().fs.readFile(path));
-        if (this.state !== 'ready') {
-          throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while reading a file');
+          : this.#ready().fs.readFile(path);
+        this.#readFilePromises.add(readPromise);
+        try {
+          const contents = await readPromise;
+          if (this.state !== 'ready') {
+            throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while reading a file');
+          }
+          return contents;
+        } finally {
+          this.#readFilePromises.delete(readPromise);
         }
-        return contents;
       },
       writeFile: async (path, contents) => {
         await this.#ready().fs.writeFile(path, contents);
@@ -349,6 +356,7 @@ class NexariVivariRuntime implements BrowserRuntime {
     this.#bootAbortController?.abort();
     for (const controller of this.#mountAbortControllers) controller.abort();
     if (this.#mountPromises.size > 0) await Promise.allSettled([...this.#mountPromises]);
+    if (this.#readFilePromises.size > 0) await Promise.allSettled([...this.#readFilePromises]);
     if (this.#exportPromises.size > 0) await Promise.allSettled([...this.#exportPromises]);
     if (this.#guestBootInFlight) await this.#bootPromise?.catch(() => undefined);
     let failure: unknown;

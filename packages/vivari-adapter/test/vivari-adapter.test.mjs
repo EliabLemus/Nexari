@@ -488,9 +488,51 @@ test('a readFile that resolves after teardown never exposes stale guest file dat
   await runtime.boot();
   const read = runtime.fs.readFile('secret.txt', 'utf8');
   await new Promise(setImmediate);
-  await runtime.teardown();
+  const teardown = runtime.teardown();
   resolveRead('secret contents');
   await assert.rejects(read, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  await teardown;
+});
+
+test('teardown waits for an in-flight readFile before tearing down the guest', async () => {
+  const fake = fakeSdk();
+  let resolveRead;
+  fake.instance.fs.readFile = () => new Promise((resolve) => { resolveRead = resolve; });
+  const runtime = createVivariRuntime({ id: 'wait-for-in-flight-read', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const read = runtime.fs.readFile('secret.txt', 'utf8');
+  await new Promise(setImmediate);
+  let teardownSettled = false;
+  const teardown = runtime.teardown().then(() => { teardownSettled = true; });
+  await new Promise(setImmediate);
+  assert.equal(teardownSettled, false);
+  assert.equal(fake.calls.teardown, 0);
+  resolveRead('secret contents');
+  await assert.rejects(read, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  await teardown;
+  assert.equal(fake.calls.teardown, 1);
+  assert.equal(runtime.state, 'terminated');
+});
+
+test('a rejected in-flight readFile cannot prevent teardown from reaching the guest', async () => {
+  const fake = fakeSdk();
+  let rejectRead;
+  fake.instance.fs.readFile = () => new Promise((_resolve, reject) => { rejectRead = reject; });
+  const runtime = createVivariRuntime({ id: 'wait-for-rejected-read', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const read = runtime.fs.readFile('secret.txt', 'utf8');
+  await new Promise(setImmediate);
+  let teardownSettled = false;
+  const teardown = runtime.teardown().then(() => { teardownSettled = true; });
+  await new Promise(setImmediate);
+  assert.equal(teardownSettled, false);
+  assert.equal(fake.calls.teardown, 0);
+  const guestFailure = new Error('guest read failed');
+  rejectRead(guestFailure);
+  await assert.rejects(read, (error) => error === guestFailure);
+  await teardown;
+  assert.equal(fake.calls.teardown, 1);
+  assert.equal(runtime.state, 'terminated');
 });
 
 test('a writeFile that resolves after teardown never reports success for a torn-down guest', async () => {
