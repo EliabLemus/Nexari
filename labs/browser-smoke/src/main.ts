@@ -46,7 +46,11 @@ async function main() {
     teardownButton.disabled = false;
   });
   const process = await runtime.spawn('node', ['server.js']);
-  void (async () => { for await (const chunk of process.output) write(chunk); })();
+  void process.exit.then((code) => { status.dataset.exitCode = String(code); });
+  void (async () => {
+    for await (const chunk of process.output) write(chunk);
+    status.dataset.outputClosed = 'true';
+  })();
   teardownButton.addEventListener('click', async () => {
     teardownButton.disabled = true;
     try {

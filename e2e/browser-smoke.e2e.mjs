@@ -75,6 +75,11 @@ try {
   assert.equal(await evaluate(`document.querySelector('#preview')?.hasAttribute('src')`), false, 'teardown must clear the preview URL');
   assert.equal(await evaluate(`document.querySelector('#preview')?.hidden`), true, 'teardown must hide the preview');
   assert.equal(await evaluate(`window.__nexariPreviewSourceClears?.()`), 2, 'the adapter must clear the preview before the lab failure-safety fallback');
+  const processExited = await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.exitCode !== undefined`));
+  assert.equal(processExited, true, 'teardown must settle the spawned process exit');
+  assert.match(await evaluate(`document.querySelector('#status')?.dataset.exitCode`), /^-?\d+$/, 'teardown must expose a numeric process exit code');
+  const outputClosed = await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.outputClosed === 'true'`));
+  assert.equal(outputClosed, true, 'teardown must close process output so terminal consumers cannot hang');
 
   await command('Target.closeTarget', { targetId });
   browser.close();
