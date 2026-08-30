@@ -76,6 +76,7 @@ try {
     /^3111:\/preview\/3111\/$/,
     'the owned Vivari port-open event must reach the host with its controlled-origin preview path',
   );
+  const previewUrl = await evaluate(`document.querySelector('#preview')?.src`);
 
   await evaluate(`(() => {
     const preview = document.querySelector('#preview');
@@ -93,6 +94,10 @@ try {
   assert.equal(await evaluate(`document.querySelector('#preview')?.hasAttribute('src')`), false, 'teardown must clear the preview URL');
   assert.equal(await evaluate(`document.querySelector('#preview')?.hidden`), true, 'teardown must hide the preview');
   assert.equal(await evaluate(`window.__nexariPreviewSourceClears?.()`), 2, 'the adapter must clear the preview before the lab failure-safety fallback');
+  const previewRouteClosed = await waitFor(() => evaluate(`fetch(${JSON.stringify(previewUrl)}).then(async (response) =>
+    !(response.status === 200 && await response.text() === 'Nexari runtime preview OK')
+  ).catch(() => true)`, true));
+  assert.equal(previewRouteClosed, true, 'teardown must stop serving the stale preview route');
   const processExited = await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.exitCode !== undefined`));
   assert.equal(processExited, true, 'teardown must settle the spawned process exit');
   assert.match(await evaluate(`document.querySelector('#status')?.dataset.exitCode`), /^-?\d+$/, 'teardown must expose a numeric process exit code');
