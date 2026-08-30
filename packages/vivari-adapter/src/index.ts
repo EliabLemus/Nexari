@@ -59,6 +59,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   #mountAbortControllers = new Set<AbortController>();
   #mountPromises = new Set<Promise<void>>();
   #readFilePromises = new Set<Promise<unknown>>();
+  #writeFilePromises = new Set<Promise<void>>();
   #exportPromises = new Set<Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>>();
   #bootPromise: Promise<void> | undefined;
   #guestBootPromise: Promise<VivariLike> | undefined;
@@ -90,9 +91,15 @@ class NexariVivariRuntime implements BrowserRuntime {
         }
       },
       writeFile: async (path, contents) => {
-        await this.#ready().fs.writeFile(path, contents);
-        if (this.state !== 'ready') {
-          throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while writing a file');
+        const writePromise = this.#ready().fs.writeFile(path, contents);
+        this.#writeFilePromises.add(writePromise);
+        try {
+          await writePromise;
+          if (this.state !== 'ready') {
+            throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while writing a file');
+          }
+        } finally {
+          this.#writeFilePromises.delete(writePromise);
         }
       },
       readdir: async (path) => {
@@ -357,6 +364,7 @@ class NexariVivariRuntime implements BrowserRuntime {
     for (const controller of this.#mountAbortControllers) controller.abort();
     if (this.#mountPromises.size > 0) await Promise.allSettled([...this.#mountPromises]);
     if (this.#readFilePromises.size > 0) await Promise.allSettled([...this.#readFilePromises]);
+    if (this.#writeFilePromises.size > 0) await Promise.allSettled([...this.#writeFilePromises]);
     if (this.#exportPromises.size > 0) await Promise.allSettled([...this.#exportPromises]);
     if (this.#guestBootInFlight) await this.#bootPromise?.catch(() => undefined);
     let failure: unknown;

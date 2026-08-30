@@ -543,9 +543,30 @@ test('a writeFile that resolves after teardown never reports success for a torn-
   await runtime.boot();
   const write = runtime.fs.writeFile('secret.txt', 'contents');
   await new Promise(setImmediate);
-  await runtime.teardown();
+  const teardown = runtime.teardown();
   resolveWrite();
   await assert.rejects(write, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  await teardown;
+});
+
+test('teardown waits for an in-flight writeFile before tearing down the guest', async () => {
+  const fake = fakeSdk();
+  let resolveWrite;
+  fake.instance.fs.writeFile = () => new Promise((resolve) => { resolveWrite = resolve; });
+  const runtime = createVivariRuntime({ id: 'wait-for-in-flight-write', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const write = runtime.fs.writeFile('secret.txt', 'contents');
+  await new Promise(setImmediate);
+  let teardownSettled = false;
+  const teardown = runtime.teardown().then(() => { teardownSettled = true; });
+  await new Promise(setImmediate);
+  assert.equal(teardownSettled, false);
+  assert.equal(fake.calls.teardown, 0);
+  resolveWrite();
+  await assert.rejects(write, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  await teardown;
+  assert.equal(fake.calls.teardown, 1);
+  assert.equal(runtime.state, 'terminated');
 });
 
 test('a readdir that resolves after teardown never exposes a stale guest directory listing', async () => {
