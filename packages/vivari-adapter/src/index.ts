@@ -60,6 +60,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   #mountPromises = new Set<Promise<void>>();
   #spawnPromises = new Set<Promise<RuntimeProcess>>();
   #readFilePromises = new Set<Promise<unknown>>();
+  #readdirPromises = new Set<Promise<string[]>>();
   #writeFilePromises = new Set<Promise<void>>();
   #exportPromises = new Set<Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>>();
   #bootPromise: Promise<void> | undefined;
@@ -104,11 +105,17 @@ class NexariVivariRuntime implements BrowserRuntime {
         }
       },
       readdir: async (path) => {
-        const entries = await this.#ready().fs.readdir(path);
-        if (this.state !== 'ready') {
-          throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while listing a directory');
+        const readdirPromise = this.#ready().fs.readdir(path);
+        this.#readdirPromises.add(readdirPromise);
+        try {
+          const entries = await readdirPromise;
+          if (this.state !== 'ready') {
+            throw new RuntimeError('TORN_DOWN', 'Runtime was torn down while listing a directory');
+          }
+          return entries;
+        } finally {
+          this.#readdirPromises.delete(readdirPromise);
         }
-        return entries;
       },
       mkdir: async (path, options) => {
         await this.#ready().fs.mkdir(path, options);
@@ -373,6 +380,7 @@ class NexariVivariRuntime implements BrowserRuntime {
     if (this.#mountPromises.size > 0) await Promise.allSettled([...this.#mountPromises]);
     if (this.#spawnPromises.size > 0) await Promise.allSettled([...this.#spawnPromises]);
     if (this.#readFilePromises.size > 0) await Promise.allSettled([...this.#readFilePromises]);
+    if (this.#readdirPromises.size > 0) await Promise.allSettled([...this.#readdirPromises]);
     if (this.#writeFilePromises.size > 0) await Promise.allSettled([...this.#writeFilePromises]);
     if (this.#exportPromises.size > 0) await Promise.allSettled([...this.#exportPromises]);
     if (this.#guestBootInFlight) await this.#bootPromise?.catch(() => undefined);

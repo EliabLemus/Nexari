@@ -521,6 +521,26 @@ test('teardown waits for an in-flight readFile before tearing down the guest', a
   assert.equal(runtime.state, 'terminated');
 });
 
+test('teardown waits for an in-flight readdir before tearing down the guest', async () => {
+  const fake = fakeSdk();
+  let resolveList;
+  fake.instance.fs.readdir = () => new Promise((resolve) => { resolveList = resolve; });
+  const runtime = createVivariRuntime({ id: 'wait-for-in-flight-readdir', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const listing = runtime.fs.readdir('secret-dir');
+  await new Promise(setImmediate);
+  let teardownSettled = false;
+  const teardown = runtime.teardown().then(() => { teardownSettled = true; });
+  await new Promise(setImmediate);
+  assert.equal(teardownSettled, false);
+  assert.equal(fake.calls.teardown, 0);
+  resolveList(['secret.txt']);
+  await assert.rejects(listing, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  await teardown;
+  assert.equal(fake.calls.teardown, 1);
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('a rejected in-flight readFile cannot prevent teardown from reaching the guest', async () => {
   const fake = fakeSdk();
   let rejectRead;
@@ -584,9 +604,10 @@ test('a readdir that resolves after teardown never exposes a stale guest directo
   await runtime.boot();
   const listing = runtime.fs.readdir('secret-dir');
   await new Promise(setImmediate);
-  await runtime.teardown();
+  const teardown = runtime.teardown();
   resolveList(['secret.txt']);
   await assert.rejects(listing, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  await teardown;
 });
 
 test('a mkdir that resolves after teardown never reports success for a torn-down guest', async () => {
