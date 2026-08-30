@@ -26,6 +26,17 @@ async function main() {
   await runtime.boot();
   runtime.attachPreview(preview);
   await runtime.mount(project);
+  const fsProofPath = '/nexari-fs-proof.txt';
+  const fsProofContents = 'Nexari filesystem bridge proof';
+  await runtime.fs.writeFile(fsProofPath, fsProofContents);
+  const readBack = await runtime.fs.readFile(fsProofPath, 'utf8');
+  const listedBeforeRemoval = await runtime.fs.readdir('/');
+  await runtime.fs.rm(fsProofPath);
+  const listedAfterRemoval = await runtime.fs.readdir('/');
+  if (readBack !== fsProofContents || !listedBeforeRemoval.includes('nexari-fs-proof.txt') || listedAfterRemoval.includes('nexari-fs-proof.txt')) {
+    throw new Error('Vivari filesystem CRUD proof failed');
+  }
+  status.dataset.fsProof = 'write-read-readdir-rm-readdir';
   runtime.on('server-ready', (port, url) => {
     preview.src = url;
     preview.hidden = false;

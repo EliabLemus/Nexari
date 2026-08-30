@@ -53,6 +53,11 @@ try {
   assert.deepEqual(resourceOrigins, [new URL(labUrl).origin], 'browser runtime assets must load only from the controlled lab origin');
   assert.equal(await evaluate(`document.querySelector('#preview')?.hidden`), false, 'preview must be visible only after server-ready');
   assert.match(await evaluate(`document.querySelector('#preview')?.src`), /^http:\/\//, 'preview must have a runtime URL');
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.fsProof`),
+    'write-read-readdir-rm-readdir',
+    'the owned Vivari filesystem bridge must complete a text CRUD round-trip before the server starts',
+  );
 
   await evaluate(`(() => {
     const preview = document.querySelector('#preview');
