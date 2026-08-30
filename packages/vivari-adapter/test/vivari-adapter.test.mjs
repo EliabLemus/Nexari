@@ -269,6 +269,75 @@ test('a process that resolves after teardown is killed and never returned to the
   assert.equal(kills, 1);
 });
 
+test('a caller-cancelled spawn kills a late process and never returns it to the host', async () => {
+  const fake = fakeSdk();
+  const controller = new AbortController();
+  const reason = new Error('caller cancelled process start');
+  let resolveSpawn;
+  let observedSignal;
+  let kills = 0;
+  const lateProcess = {
+    pid: 43,
+    output: stream,
+    stdout: stream,
+    stderr: stream,
+    input: new WritableStream(),
+    exit: Promise.resolve(0),
+    kill() { kills++; },
+  };
+  fake.instance.spawn = (_command, _args, { signal }) => {
+    observedSignal = signal;
+    return new Promise((resolve) => { resolveSpawn = resolve; });
+  };
+  const runtime = createVivariRuntime({ id: 'ignored-spawn-abort', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const spawn = runtime.spawn('node', ['server.js'], { signal: controller.signal });
+  await new Promise(setImmediate);
+  controller.abort(reason);
+  assert.equal(observedSignal.aborted, true);
+  resolveSpawn(lateProcess);
+  await assert.rejects(spawn, (error) => error === reason);
+  assert.equal(kills, 1);
+});
+
+test('teardown takes precedence over caller cancellation for a late process', async () => {
+  const fake = fakeSdk();
+  const controller = new AbortController();
+  const callerReason = new Error('caller cancelled process start');
+  let resolveSpawn;
+  let kills = 0;
+  const lateProcess = {
+    pid: 44,
+    output: stream,
+    stdout: stream,
+    stderr: stream,
+    input: new WritableStream(),
+    exit: Promise.resolve(0),
+    kill() { kills++; },
+  };
+  fake.instance.spawn = () => new Promise((resolve) => { resolveSpawn = resolve; });
+  const runtime = createVivariRuntime({ id: 'teardown-precedes-spawn-abort', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const spawn = runtime.spawn('node', ['server.js'], { signal: controller.signal });
+  await new Promise(setImmediate);
+  await runtime.teardown();
+  controller.abort(callerReason);
+  resolveSpawn(lateProcess);
+  await assert.rejects(spawn, (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
+  assert.equal(kills, 1);
+});
+
+test('an already-aborted spawn signal fails closed before invoking the guest', async () => {
+  const fake = fakeSdk();
+  const controller = new AbortController();
+  const reason = new Error('caller cancelled before process start');
+  controller.abort(reason);
+  const runtime = createVivariRuntime({ id: 'already-aborted-spawn', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  await assert.rejects(runtime.spawn('node', ['server.js'], { signal: controller.signal }), (error) => error === reason);
+  assert.equal(fake.calls.spawn, 0);
+});
+
 test('a mount that resolves after teardown rejects as torn down', async () => {
   const fake = fakeSdk();
   let resolveMount;
