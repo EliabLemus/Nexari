@@ -175,8 +175,10 @@ class NexariVivariRuntime implements BrowserRuntime {
         const ownedWatcher: RuntimeFsWatcher = {
           get closed() { return watcher.closed; },
           close: () => {
-            watcher.close();
+            // A guest close may synchronously emit (or throw). Stop forwarding
+            // before entering guest code so no stale callback reaches the host.
             active = false;
+            watcher.close();
             this.#watchers.delete(ownedWatcher);
           },
           [Symbol.asyncIterator]: async function* () {

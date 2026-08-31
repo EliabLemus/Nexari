@@ -892,6 +892,30 @@ test('a closed filesystem watcher cannot deliver a late guest callback while the
   await runtime.teardown();
 });
 
+test('a watcher close failure cannot synchronously deliver a stale guest callback', async () => {
+  const fake = fakeSdk();
+  let guestListener;
+  fake.instance.fs.watch = (_path, listener) => {
+    guestListener = listener;
+    return {
+      closed: false,
+      close() {
+        guestListener({ kind: 'change', path: '/src/stale-during-close.js' });
+        throw new Error('guest watcher close failed');
+      },
+      [Symbol.asyncIterator]: async function* () {},
+    };
+  };
+  const runtime = createVivariRuntime({ id: 'watch-close-failure-stale-callback', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const received = [];
+  const watcher = runtime.fs.watch('/src', (event) => { received.push(event); });
+  assert.throws(() => watcher.close(), /guest watcher close failed/);
+  assert.deepEqual(received, []);
+  await assert.rejects(runtime.teardown(), /guest watcher close failed/);
+  assert.deepEqual(received, []);
+});
+
 test('a closed filesystem watcher iterator cannot deliver a late guest event while the runtime remains ready', async () => {
   const fake = fakeSdk();
   let resolveNext;
