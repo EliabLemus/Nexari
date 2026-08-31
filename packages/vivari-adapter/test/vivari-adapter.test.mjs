@@ -875,6 +875,44 @@ test('teardown closes adapter-owned filesystem watchers before tearing down the 
   assert.equal(fake.calls.teardown, 1);
 });
 
+test('a filesystem watcher iterator cannot deliver a guest event after teardown', async () => {
+  const fake = fakeSdk();
+  let resolveNext;
+  fake.instance.fs.watch = () => ({
+    closed: false,
+    close() { this.closed = true; },
+    [Symbol.asyncIterator]: () => ({
+      next: () => new Promise((resolve) => { resolveNext = resolve; }),
+    }),
+  });
+  const runtime = createVivariRuntime({ id: 'late-filesystem-watch-event', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const watcher = runtime.fs.watch('/src');
+  const nextEvent = watcher[Symbol.asyncIterator]().next();
+  await runtime.teardown();
+  resolveNext({ done: false, value: { kind: 'change', path: '/src/stale.js' } });
+  assert.deepEqual(await nextEvent, { done: true, value: undefined });
+});
+
+test('a filesystem watcher iterator cannot leak a guest rejection after teardown', async () => {
+  const fake = fakeSdk();
+  let rejectNext;
+  fake.instance.fs.watch = () => ({
+    closed: false,
+    close() { this.closed = true; },
+    [Symbol.asyncIterator]: () => ({
+      next: () => new Promise((_resolve, reject) => { rejectNext = reject; }),
+    }),
+  });
+  const runtime = createVivariRuntime({ id: 'late-filesystem-watch-rejection', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const watcher = runtime.fs.watch('/src');
+  const nextEvent = watcher[Symbol.asyncIterator]().next();
+  await runtime.teardown();
+  rejectNext(new Error('stale guest watcher rejection'));
+  assert.deepEqual(await nextEvent, { done: true, value: undefined });
+});
+
 test('teardown unsubscribes port listeners so stale port state cannot reach the host', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'stale-port-events', isIsolated: () => true, loadSdk: fake.loader });

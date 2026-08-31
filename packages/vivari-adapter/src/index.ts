@@ -170,13 +170,27 @@ class NexariVivariRuntime implements BrowserRuntime {
         const watcher = this.#ready().fs.watch(path, (event) => {
           if (this.state === 'ready') listener?.(event);
         });
+        const runtime = this;
         const ownedWatcher: RuntimeFsWatcher = {
           get closed() { return watcher.closed; },
           close: () => {
             watcher.close();
             this.#watchers.delete(ownedWatcher);
           },
-          [Symbol.asyncIterator]: () => watcher[Symbol.asyncIterator](),
+          [Symbol.asyncIterator]: async function* () {
+            const iterator = watcher[Symbol.asyncIterator]();
+            while (runtime.state === 'ready') {
+              let next: IteratorResult<RuntimeFsChangeEvent>;
+              try {
+                next = await iterator.next();
+              } catch (cause) {
+                if (runtime.state !== 'ready') return;
+                throw cause;
+              }
+              if (runtime.state !== 'ready' || next.done) return;
+              yield next.value;
+            }
+          },
         };
         this.#watchers.add(ownedWatcher);
         return ownedWatcher;
