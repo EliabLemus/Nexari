@@ -12,6 +12,10 @@ const project = {
     "const server = createServer((_, res) => { res.setHeader('content-type', 'text/plain'); res.end('Nexari runtime preview OK'); });",
     "server.listen(3111, () => console.log('ready'));",
   ].join('\n') } },
+  'stdin-echo.js': { file: { contents: [
+    "process.stdin.setEncoding('utf8');",
+    "process.stdin.on('data', (chunk) => process.stdout.write(`stdin:${chunk}`));",
+  ].join('\n') } },
 };
 
 async function main() {
@@ -48,6 +52,17 @@ async function main() {
     throw new Error('Vivari binary filesystem proof failed');
   }
   status.dataset.fsBinaryProof = 'write-bytes-read-bytes-rm';
+  const stdinToken = 'nexari-stdin-round-trip';
+  const stdinProcess = await runtime.spawn('node', ['stdin-echo.js']);
+  const stdinWriter = stdinProcess.input.getWriter();
+  await stdinWriter.write(stdinToken);
+  await stdinWriter.close();
+  let stdinOutput = '';
+  for await (const chunk of stdinProcess.output) stdinOutput += chunk;
+  if (!stdinOutput.includes(`stdin:${stdinToken}`)) {
+    throw new Error('Vivari process stdin proof failed');
+  }
+  status.dataset.stdinProof = 'written-echoed';
   runtime.on('port', (port, kind, url) => {
     if (kind === 'open' && port === 3111) status.dataset.portOpen = `${port}:${url}`;
   });

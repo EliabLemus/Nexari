@@ -71,6 +71,11 @@ try {
     'write-bytes-read-bytes-rm',
     'the owned Vivari filesystem bridge must round-trip binary payloads byte-for-byte before the server starts',
   );
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.stdinProof`),
+    'written-echoed',
+    'the owned Vivari process bridge must round-trip stdin through a real browser guest before the server starts',
+  );
   assert.match(
     await evaluate(`document.querySelector('#status')?.dataset.portOpen`),
     /^3111:\/preview\/3111\/$/,
