@@ -129,7 +129,9 @@ async function bootRuntime() {
   }
   status.dataset.processOptionsProof = 'cwd-env-args-exit';
   runtime.on('port', (port, kind, url) => {
-    if (kind === 'open' && port === 3111) status.dataset.portOpen = `${port}:${url}`;
+    if (port !== 3111) return;
+    if (kind === 'open') status.dataset.portOpen = `${port}:${url}`;
+    if (kind === 'close') status.dataset.portClose = `${port}:${url}`;
   });
   runtime.on('server-ready', (port, url) => {
     void proveProcessCancellation(runtime).then(() => {

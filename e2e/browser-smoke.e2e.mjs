@@ -155,6 +155,12 @@ try {
   assert.equal(await evaluate(`document.querySelector('#preview')?.hasAttribute('src')`), false, 'teardown must clear the preview URL');
   assert.equal(await evaluate(`document.querySelector('#preview')?.hidden`), true, 'teardown must hide the preview');
   assert.equal(await evaluate(`window.__nexariPreviewSourceClears?.()`), 2, 'the adapter must clear the preview before the lab failure-safety fallback');
+  const portClosed = await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.portClose === '3111:/preview/3111/'`));
+  assert.equal(
+    portClosed,
+    true,
+    'teardown must forward the owned Vivari port-close event before the preview route disappears',
+  );
   const previewRouteClosed = await waitFor(() => evaluate(`fetch(${JSON.stringify(previewUrl)}).then(async (response) =>
     !(response.status === 200 && await response.text() === 'Nexari runtime preview OK')
   ).catch(() => true)`, true));

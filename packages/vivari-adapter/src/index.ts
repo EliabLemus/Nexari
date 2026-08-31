@@ -372,7 +372,9 @@ class NexariVivariRuntime implements BrowserRuntime {
       detach = instance.on('server-ready', forwardIfReady);
     } else if (event === 'port') {
       const forwardIfReady = (port: number, kind: 'open' | 'close', url: string) => {
-        if (this.state === 'ready') (listener as unknown as (port: number, kind: 'open' | 'close', url: string) => void)(port, kind, url);
+        if (this.state === 'ready' || (this.state === 'tearing_down' && kind === 'close')) {
+          (listener as unknown as (port: number, kind: 'open' | 'close', url: string) => void)(port, kind, url);
+        }
       };
       detach = instance.on('port', forwardIfReady);
     } else {
@@ -449,7 +451,6 @@ class NexariVivariRuntime implements BrowserRuntime {
       }
     }
     for (const detach of [...this.#detachPreview]) await cleanUp(detach);
-    for (const detach of [...this.#detachEvents]) await cleanUp(detach);
     const instance = this.#instance;
     if (instance) {
       try {
@@ -459,6 +460,9 @@ class NexariVivariRuntime implements BrowserRuntime {
         failure ??= error;
       }
     }
+    // Keep port subscriptions through guest teardown so its terminal close
+    // events can reach the host, then detach every listener before termination.
+    for (const detach of [...this.#detachEvents]) await cleanUp(detach);
     this.#lifecycle.markTerminated();
     if (failure) throw failure;
   }
