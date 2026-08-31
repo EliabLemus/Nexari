@@ -288,6 +288,30 @@ test('teardown kills a process already returned to the host before tearing down 
   assert.equal(fake.calls.teardown, 1);
 });
 
+test('teardown does not kill a process twice after the host already cancelled it', async () => {
+  const fake = fakeSdk();
+  let kills = 0;
+  fake.instance.spawn = async () => ({
+    pid: 43,
+    output: stream,
+    stdout: stream,
+    stderr: stream,
+    input: new WritableStream(),
+    exit: new Promise(() => {}),
+    kill() {
+      kills++;
+      if (kills > 1) throw new Error('guest process was killed twice');
+    },
+  });
+  const runtime = createVivariRuntime({ id: 'host-cancelled-process-on-teardown', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const process = await runtime.spawn('node', ['stall.js']);
+  process.kill();
+  await runtime.teardown();
+  assert.equal(kills, 1);
+  assert.equal(fake.calls.teardown, 1);
+});
+
 test('maps the owned fork command-not-found rejection to the runtime contract', async () => {
   const fake = fakeSdk();
   const guestError = Object.assign(new Error('command missing'), { code: 'ERR_COMMAND_NOT_FOUND' });

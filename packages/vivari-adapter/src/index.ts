@@ -300,12 +300,26 @@ class NexariVivariRuntime implements BrowserRuntime {
         }
         throw controller.signal.reason;
       }
-      this.#processes.add(process);
-      void process.exit.then(
-        () => { this.#processes.delete(process); },
-        () => { this.#processes.delete(process); },
+      let killed = false;
+      const trackedProcess: RuntimeProcess = {
+        pid: process.pid,
+        output: process.output,
+        stdout: process.stdout,
+        stderr: process.stderr,
+        input: process.input,
+        exit: process.exit,
+        kill: () => {
+          if (killed) return;
+          process.kill();
+          killed = true;
+        },
+      };
+      this.#processes.add(trackedProcess);
+      void trackedProcess.exit.then(
+        () => { this.#processes.delete(trackedProcess); },
+        () => { this.#processes.delete(trackedProcess); },
       );
-      return process;
+      return trackedProcess;
     } catch (cause) {
       if (isVivariCommandNotFound(cause)) throw new RuntimeError('COMMAND_NOT_FOUND', cause.message, cause);
       throw cause;
