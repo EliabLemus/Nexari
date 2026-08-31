@@ -108,6 +108,11 @@ try {
     'the owned Vivari export bridge must round-trip mounted files byte-exact without truncation before the server starts',
   );
   assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.capabilitiesProof`),
+    'native_addons-docker-tcp_remote-udp-ssh-linux_binary-unsupported',
+    'the browser lab must surface every browser-runtime native limitation as explicitly unsupported',
+  );
+  assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.stdinProof`),
     'written-echoed',
     'the owned Vivari process bridge must round-trip stdin through a real browser guest before the server starts',
