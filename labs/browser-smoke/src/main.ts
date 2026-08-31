@@ -52,6 +52,19 @@ async function main() {
     throw new Error('Vivari binary filesystem proof failed');
   }
   status.dataset.fsBinaryProof = 'write-bytes-read-bytes-rm';
+  const snapshot = await runtime.export('/');
+  const exportedContents = new Map(snapshot.files.map(({ path, contents }) => [path, contents]));
+  for (const [path, expectedContents] of Object.entries({
+    'server.js': project['server.js'].file.contents,
+    'stdin-echo.js': project['stdin-echo.js'].file.contents,
+  })) {
+    const contents = exportedContents.get(path);
+    if (!(contents instanceof Uint8Array) || new TextDecoder().decode(contents) !== expectedContents) {
+      throw new Error(`Vivari export proof failed for ${path}`);
+    }
+  }
+  if (snapshot.truncated) throw new Error('Vivari export proof unexpectedly truncated the project snapshot');
+  status.dataset.fsExportProof = 'export-byte-exact-truncated-false';
   const stdinToken = 'nexari-stdin-round-trip';
   const stdinProcess = await runtime.spawn('node', ['stdin-echo.js']);
   const stdinWriter = stdinProcess.input.getWriter();

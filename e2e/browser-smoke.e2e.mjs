@@ -14,11 +14,12 @@ const preview = spawn('npm', ['run', 'preview', '--', '--port', '4174'], {
 let previewOutput = '';
 preview.stdout.on('data', (chunk) => { previewOutput += chunk; });
 preview.stderr.on('data', (chunk) => { previewOutput += chunk; });
+let browser;
 
 try {
   await waitFor(() => fetch(labUrl).then((response) => response.ok));
   const version = await (await fetch(`${cdpUrl}/json/version`)).json();
-  const browser = new WebSocket(version.webSocketDebuggerUrl);
+  browser = new WebSocket(version.webSocketDebuggerUrl);
   await once(browser, 'open');
   let nextId = 0;
   const pending = new Map();
@@ -72,6 +73,11 @@ try {
     'the owned Vivari filesystem bridge must round-trip binary payloads byte-for-byte before the server starts',
   );
   assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.fsExportProof`),
+    'export-byte-exact-truncated-false',
+    'the owned Vivari export bridge must round-trip mounted files byte-exact without truncation before the server starts',
+  );
+  assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.stdinProof`),
     'written-echoed',
     'the owned Vivari process bridge must round-trip stdin through a real browser guest before the server starts',
@@ -113,6 +119,7 @@ try {
   browser.close();
   console.log('browser lab E2E: PASS (ready server preview followed by safe teardown)');
 } finally {
+  browser?.close();
   preview.kill('SIGTERM');
 }
 
