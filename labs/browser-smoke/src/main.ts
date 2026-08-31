@@ -130,6 +130,7 @@ teardownButton.addEventListener('click', async () => {
     preview.hidden = true;
   }
   activeRuntime = undefined;
+  delete status.dataset.runtimeId;
   status.dataset.state = 'terminated';
   status.textContent = 'Runtime terminated; preview detached';
   rebootButton.disabled = false;
