@@ -875,6 +875,41 @@ test('teardown closes adapter-owned filesystem watchers before tearing down the 
   assert.equal(fake.calls.teardown, 1);
 });
 
+test('a closed filesystem watcher cannot deliver a late guest callback while the runtime remains ready', async () => {
+  const fake = fakeSdk();
+  let guestListener;
+  fake.instance.fs.watch = (_path, listener) => {
+    guestListener = listener;
+    return { closed: false, close() { this.closed = true; }, [Symbol.asyncIterator]: async function* () {} };
+  };
+  const runtime = createVivariRuntime({ id: 'closed-filesystem-watch-callback', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const received = [];
+  const watcher = runtime.fs.watch('/src', (event) => { received.push(event); });
+  watcher.close();
+  guestListener({ kind: 'change', path: '/src/stale.js' });
+  assert.deepEqual(received, []);
+  await runtime.teardown();
+});
+
+test('a closed filesystem watcher iterator cannot deliver a late guest event while the runtime remains ready', async () => {
+  const fake = fakeSdk();
+  let resolveNext;
+  fake.instance.fs.watch = () => ({
+    closed: false,
+    close() { this.closed = true; },
+    [Symbol.asyncIterator]: () => ({ next: () => new Promise((resolve) => { resolveNext = resolve; }) }),
+  });
+  const runtime = createVivariRuntime({ id: 'closed-filesystem-watch-iterator', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const watcher = runtime.fs.watch('/src');
+  const nextEvent = watcher[Symbol.asyncIterator]().next();
+  watcher.close();
+  resolveNext({ done: false, value: { kind: 'change', path: '/src/stale.js' } });
+  assert.deepEqual(await nextEvent, { done: true, value: undefined });
+  await runtime.teardown();
+});
+
 test('a filesystem watcher iterator cannot deliver a guest event after teardown', async () => {
   const fake = fakeSdk();
   let resolveNext;
