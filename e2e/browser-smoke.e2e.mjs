@@ -73,6 +73,11 @@ try {
     'the owned Vivari filesystem bridge must round-trip binary payloads byte-for-byte before the server starts',
   );
   assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.fsMkdirProof`),
+    'mkdir-p-readdir-write-rm-recursive-readdir',
+    'the owned Vivari filesystem bridge must create, populate, and recursively remove a nested directory before the server starts',
+  );
+  assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.fsExportProof`),
     'export-byte-exact-truncated-false',
     'the owned Vivari export bridge must round-trip mounted files byte-exact without truncation before the server starts',

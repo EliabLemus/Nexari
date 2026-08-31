@@ -52,6 +52,17 @@ async function main() {
     throw new Error('Vivari binary filesystem proof failed');
   }
   status.dataset.fsBinaryProof = 'write-bytes-read-bytes-rm';
+  const fsMkdirProofDirectory = '/nexari-dir-proof/nested';
+  const fsMkdirProofRoot = '/nexari-dir-proof';
+  await runtime.fs.mkdir(fsMkdirProofDirectory, { recursive: true });
+  const listedAfterMkdir = await runtime.fs.readdir('/');
+  await runtime.fs.writeFile(`${fsMkdirProofDirectory}/proof.txt`, 'Nexari nested directory proof');
+  await runtime.fs.rm(fsMkdirProofRoot, { recursive: true });
+  const listedAfterRecursiveRemoval = await runtime.fs.readdir('/');
+  if (!listedAfterMkdir.includes('nexari-dir-proof') || listedAfterRecursiveRemoval.includes('nexari-dir-proof')) {
+    throw new Error('Vivari nested directory lifecycle proof failed');
+  }
+  status.dataset.fsMkdirProof = 'mkdir-p-readdir-write-rm-recursive-readdir';
   const snapshot = await runtime.export('/');
   const exportedContents = new Map(snapshot.files.map(({ path, contents }) => [path, contents]));
   for (const [path, expectedContents] of Object.entries({
