@@ -7,17 +7,26 @@ if (!cdpUrl) {
 }
 
 const labUrl = 'http://127.0.0.1:4174';
+const nonIsolatedLabUrl = 'http://127.0.0.1:4175';
 const preview = spawn('npm', ['run', 'preview', '--', '--port', '4174'], {
   cwd: new URL('../labs/browser-smoke/', import.meta.url),
+  stdio: ['ignore', 'pipe', 'pipe'],
+});
+const nonIsolatedPreview = spawn('npm', ['run', 'preview', '--', '--port', '4175'], {
+  cwd: new URL('../labs/browser-smoke/', import.meta.url),
+  env: { ...process.env, NEXARI_LAB_ISOLATION: 'off' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let previewOutput = '';
 preview.stdout.on('data', (chunk) => { previewOutput += chunk; });
 preview.stderr.on('data', (chunk) => { previewOutput += chunk; });
+nonIsolatedPreview.stdout.on('data', (chunk) => { previewOutput += chunk; });
+nonIsolatedPreview.stderr.on('data', (chunk) => { previewOutput += chunk; });
 let browser;
 
 try {
   await waitFor(() => fetch(labUrl).then((response) => response.ok));
+  await waitFor(() => fetch(nonIsolatedLabUrl).then((response) => response.ok));
   const version = await (await fetch(`${cdpUrl}/json/version`)).json();
   browser = new WebSocket(version.webSocketDebuggerUrl);
   await once(browser, 'open');
@@ -46,6 +55,17 @@ try {
   };
 
   await sessionCommand('Page.enable');
+  await sessionCommand('Page.navigate', { url: nonIsolatedLabUrl });
+  const isolationFailed = await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.state === 'isolation-failed'`));
+  assert.equal(isolationFailed, true, `non-isolated browser lab must fail closed before booting a guest:\n${previewOutput}`);
+  assert.equal(await evaluate('crossOriginIsolated'), false, 'the negative browser proof must run without cross-origin isolation');
+  assert.equal(await evaluate(`document.querySelector('#status')?.dataset.errorCode`), 'ISOLATION_REQUIRED', 'the host must surface the typed isolation failure');
+  assert.equal(
+    await evaluate(`performance.getEntriesByType('resource').some(({ name }) => /\\/assets\\/dist-/.test(new URL(name).pathname))`),
+    false,
+    'a non-isolated browser context must not load the dynamically imported Vivari SDK chunk',
+  );
+
   await sessionCommand('Page.navigate', { url: labUrl });
   const ready = await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.state === 'ready'`), 120_000);
   assert.equal(ready, true, `browser lab never reached server-ready state:\n${previewOutput}`);
@@ -142,6 +162,7 @@ try {
 } finally {
   browser?.close();
   preview.kill('SIGTERM');
+  nonIsolatedPreview.kill('SIGTERM');
 }
 
 async function waitFor(check, timeoutMs = 30_000) {

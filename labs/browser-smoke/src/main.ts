@@ -23,6 +23,7 @@ const project = {
 async function bootRuntime() {
   if (!crossOriginIsolated || typeof SharedArrayBuffer === 'undefined') {
     status.dataset.state = 'isolation-failed';
+    status.dataset.errorCode = 'ISOLATION_REQUIRED';
     status.textContent = 'Isolation prerequisite failed';
     return;
   }

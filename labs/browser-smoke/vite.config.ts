@@ -3,10 +3,12 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const isolation = {
-  'Cross-Origin-Opener-Policy': 'same-origin',
-  'Cross-Origin-Embedder-Policy': 'require-corp',
-};
+const isolation = process.env.NEXARI_LAB_ISOLATION === 'off'
+  ? {}
+  : {
+    'Cross-Origin-Opener-Policy': 'same-origin',
+    'Cross-Origin-Embedder-Policy': 'require-corp',
+  };
 
 function serveNexariAssets(): Plugin {
   const assetsDir = path.resolve(fileURLToPath(new URL('../../runtime/vivari/packages/core/dist/assets/', import.meta.url)));
