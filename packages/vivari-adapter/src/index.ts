@@ -48,6 +48,16 @@ export async function loadPinnedVivariSdk(): Promise<VivariSdk> {
   return { boot: (options) => Vivari.boot(options) };
 }
 
+/**
+ * Clear the pinned fork's origin-scoped VFS only when a host explicitly asks for
+ * a clean-room runtime instance. Normal adapter boots retain the fork's durable
+ * project storage.
+ */
+export async function resetPinnedVivariVfs(): Promise<boolean> {
+  const { resetVfs } = await import('../../../runtime/vivari/packages/core/dist/index.js');
+  return resetVfs();
+}
+
 class NexariVivariRuntime implements BrowserRuntime {
   readonly id: string;
   readonly fs: RuntimeFileSystem;

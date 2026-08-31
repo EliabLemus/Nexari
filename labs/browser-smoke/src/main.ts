@@ -1,4 +1,4 @@
-import { createVivariRuntime, loadPinnedVivariSdk } from '../../../packages/vivari-adapter/src/index.ts';
+import { createVivariRuntime, loadPinnedVivariSdk, resetPinnedVivariVfs } from '../../../packages/vivari-adapter/src/index.ts';
 
 const status = document.querySelector<HTMLParagraphElement>('#status')!;
 const output = document.querySelector<HTMLPreElement>('#output')!;
@@ -38,6 +38,10 @@ async function bootRuntime() {
   status.textContent = 'Booting pinned Vivari runtime…';
   teardownButton.disabled = true;
   rebootButton.disabled = true;
+  // This lab proves independent, short-lived runtime instances. Vivari's default
+  // OPFS mirror is intentionally durable, so clear only this controlled lab's
+  // origin-scoped state before constructing each fresh instance.
+  await resetPinnedVivariVfs();
   const runtimeId = crypto.randomUUID();
   const runtime = createVivariRuntime({ id: runtimeId, loadSdk: loadPinnedVivariSdk });
   activeRuntime = runtime;
