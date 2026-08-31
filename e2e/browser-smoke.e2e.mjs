@@ -70,6 +70,11 @@ try {
   const ready = await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.state === 'ready'`), 120_000);
   assert.equal(ready, true, `browser lab never reached server-ready state:\n${previewOutput}`);
   assert.equal(await evaluate('crossOriginIsolated'), true, 'guest runtime must start only in an isolated browser context');
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.fsInstanceIsolation`),
+    'fresh-before-write',
+    'a newly booted Vivari runtime must not inherit a filesystem marker from a prior runtime instance',
+  );
   const resourceOrigins = await evaluate(`Array.from(new Set(performance.getEntriesByType('resource').map(({ name }) => new URL(name).origin)))`);
   assert.deepEqual(resourceOrigins, [new URL(labUrl).origin], 'browser runtime assets must load only from the controlled lab origin');
   assert.equal(await evaluate(`document.querySelector('#preview')?.hidden`), false, 'preview must be visible only after server-ready');
@@ -149,6 +154,11 @@ try {
   const rebootPreviewUrl = await evaluate(`document.querySelector('#preview')?.src`);
   const rebootRuntimeId = await evaluate(`document.querySelector('#status')?.dataset.runtimeId`);
   assert.notEqual(rebootRuntimeId, runtimeId, 'a reboot must create a distinct Vivari runtime instance');
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.fsInstanceIsolation`),
+    'fresh-before-write',
+    'the rebooted Vivari runtime must start without the prior instance filesystem marker',
+  );
   assert.equal(rebootPreviewUrl, previewUrl, 'the controlled-origin preview route is port-addressed and must remain stable across fresh runtime instances');
   assert.deepEqual(
     await evaluate(`fetch(document.querySelector('#preview').src).then(async (response) => ({ status: response.status, body: await response.text() }))`, true),

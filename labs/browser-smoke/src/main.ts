@@ -37,6 +37,13 @@ async function bootRuntime() {
   await runtime.boot();
   runtime.attachPreview(preview);
   await runtime.mount(project);
+  const instanceMarkerPath = 'nexari-runtime-instance-marker.txt';
+  const initialSnapshot = await runtime.export('/');
+  if (initialSnapshot.files.some(({ path }) => path.replace(/^\//, '') === instanceMarkerPath)) {
+    throw new Error('Vivari runtime instance inherited a filesystem marker from an earlier instance');
+  }
+  await runtime.fs.writeFile(`/${instanceMarkerPath}`, runtimeId);
+  status.dataset.fsInstanceIsolation = 'fresh-before-write';
   const fsProofPath = '/nexari-fs-proof.txt';
   const fsProofContents = 'Nexari filesystem bridge proof';
   await runtime.fs.writeFile(fsProofPath, fsProofContents);
