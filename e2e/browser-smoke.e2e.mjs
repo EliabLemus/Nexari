@@ -179,7 +179,11 @@ try {
   assert.equal(await evaluate(`document.querySelector('#reboot')?.disabled`), false, 'a terminated runtime must allow the lab host to create a fresh isolated runtime');
   await evaluate(`document.querySelector('#reboot')?.click()`);
   const rebooted = await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.state === 'ready'`), 120_000);
-  assert.equal(rebooted, true, 'a fresh runtime must reach server-ready after the prior runtime is torn down');
+  assert.equal(
+    rebooted,
+    true,
+    `a fresh runtime must reach server-ready after the prior runtime is torn down; state=${await evaluate(`document.querySelector('#status')?.dataset.state`)} status=${await evaluate(`document.querySelector('#status')?.textContent`)}`,
+  );
   const rebootPreviewUrl = await evaluate(`document.querySelector('#preview')?.src`);
   const rebootRuntimeId = await evaluate(`document.querySelector('#status')?.dataset.runtimeId`);
   assert.notEqual(rebootRuntimeId, runtimeId, 'a reboot must create a distinct Vivari runtime instance');
