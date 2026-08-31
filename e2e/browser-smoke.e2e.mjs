@@ -93,6 +93,7 @@ try {
     'the owned Vivari port-open event must reach the host with its controlled-origin preview path',
   );
   const previewUrl = await evaluate(`document.querySelector('#preview')?.src`);
+  const runtimeId = await evaluate(`document.querySelector('#status')?.dataset.runtimeId`);
 
   await evaluate(`(() => {
     const preview = document.querySelector('#preview');
@@ -119,6 +120,20 @@ try {
   assert.match(await evaluate(`document.querySelector('#status')?.dataset.exitCode`), /^-?\d+$/, 'teardown must expose a numeric process exit code');
   const outputClosed = await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.outputClosed === 'true'`));
   assert.equal(outputClosed, true, 'teardown must close process output so terminal consumers cannot hang');
+
+  assert.equal(await evaluate(`document.querySelector('#reboot')?.disabled`), false, 'a terminated runtime must allow the lab host to create a fresh isolated runtime');
+  await evaluate(`document.querySelector('#reboot')?.click()`);
+  const rebooted = await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.state === 'ready'`), 120_000);
+  assert.equal(rebooted, true, 'a fresh runtime must reach server-ready after the prior runtime is torn down');
+  const rebootPreviewUrl = await evaluate(`document.querySelector('#preview')?.src`);
+  const rebootRuntimeId = await evaluate(`document.querySelector('#status')?.dataset.runtimeId`);
+  assert.notEqual(rebootRuntimeId, runtimeId, 'a reboot must create a distinct Vivari runtime instance');
+  assert.equal(rebootPreviewUrl, previewUrl, 'the controlled-origin preview route is port-addressed and must remain stable across fresh runtime instances');
+  assert.deepEqual(
+    await evaluate(`fetch(document.querySelector('#preview').src).then(async (response) => ({ status: response.status, body: await response.text() }))`, true),
+    { status: 200, body: 'Nexari runtime preview OK' },
+    'a rebooted runtime preview must serve a fresh in-VM response',
+  );
 
   await command('Target.closeTarget', { targetId });
   browser.close();

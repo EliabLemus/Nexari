@@ -4,6 +4,8 @@ const status = document.querySelector<HTMLParagraphElement>('#status')!;
 const output = document.querySelector<HTMLPreElement>('#output')!;
 const preview = document.querySelector<HTMLIFrameElement>('#preview')!;
 const teardownButton = document.querySelector<HTMLButtonElement>('#teardown')!;
+const rebootButton = document.querySelector<HTMLButtonElement>('#reboot')!;
+let activeRuntime: ReturnType<typeof createVivariRuntime> | undefined;
 
 const write = (line: string) => { output.textContent += `${line}\n`; };
 const project = {
@@ -18,7 +20,7 @@ const project = {
   ].join('\n') } },
 };
 
-async function main() {
+async function bootRuntime() {
   if (!crossOriginIsolated || typeof SharedArrayBuffer === 'undefined') {
     status.dataset.state = 'isolation-failed';
     status.textContent = 'Isolation prerequisite failed';
@@ -26,7 +28,11 @@ async function main() {
   }
   status.dataset.state = 'booting';
   status.textContent = 'Booting pinned Vivari runtime…';
-  const runtime = createVivariRuntime({ id: crypto.randomUUID(), loadSdk: loadPinnedVivariSdk });
+  teardownButton.disabled = true;
+  rebootButton.disabled = true;
+  const runtimeId = crypto.randomUUID();
+  const runtime = createVivariRuntime({ id: runtimeId, loadSdk: loadPinnedVivariSdk });
+  activeRuntime = runtime;
   await runtime.boot();
   runtime.attachPreview(preview);
   await runtime.mount(project);
@@ -93,6 +99,7 @@ async function main() {
   runtime.on('server-ready', (port, url) => {
     preview.src = url;
     preview.hidden = false;
+    status.dataset.runtimeId = runtimeId;
     status.dataset.state = 'ready';
     status.textContent = `Ready: in-VM HTTP server on ${port}`;
     write(`server-ready ${url}`);
@@ -104,26 +111,38 @@ async function main() {
     for await (const chunk of process.output) write(chunk);
     status.dataset.outputClosed = 'true';
   })();
-  teardownButton.addEventListener('click', async () => {
-    teardownButton.disabled = true;
-    try {
-      await runtime.teardown();
-    } catch (error) {
-      status.dataset.state = 'failed';
-      status.textContent = `Runtime teardown failed: ${error instanceof Error ? error.message : String(error)}`;
-      teardownButton.disabled = false;
-      return;
-    } finally {
-      preview.removeAttribute('src');
-      preview.hidden = true;
-    }
-    status.dataset.state = 'terminated';
-    status.textContent = 'Runtime terminated; preview detached';
-  });
 }
 
-main().catch((error) => {
+teardownButton.addEventListener('click', async () => {
+  const runtime = activeRuntime;
+  if (!runtime) return;
+  teardownButton.disabled = true;
+  rebootButton.disabled = true;
+  try {
+    await runtime.teardown();
+  } catch (error) {
+    status.dataset.state = 'failed';
+    status.textContent = `Runtime teardown failed: ${error instanceof Error ? error.message : String(error)}`;
+    teardownButton.disabled = false;
+    return;
+  } finally {
+    preview.removeAttribute('src');
+    preview.hidden = true;
+  }
+  activeRuntime = undefined;
+  status.dataset.state = 'terminated';
+  status.textContent = 'Runtime terminated; preview detached';
+  rebootButton.disabled = false;
+});
+
+rebootButton.addEventListener('click', () => {
+  void bootRuntime().catch(reportRuntimeFailure);
+});
+
+function reportRuntimeFailure(error: unknown) {
   status.dataset.state = 'failed';
   status.textContent = `Runtime failed: ${error instanceof Error ? error.message : String(error)}`;
   console.error(error);
-});
+}
+
+void bootRuntime().catch(reportRuntimeFailure);

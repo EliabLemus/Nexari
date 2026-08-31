@@ -13,13 +13,13 @@ for (const needle of ['createVivariRuntime', 'loadPinnedVivariSdk', 'crossOrigin
 }
 if (source.includes('Vivari.boot')) throw new Error('browser lab must boot Vivari only through the adapter seam');
 if (source.includes('detachPreview();')) throw new Error('browser lab teardown must exercise adapter-owned preview cleanup rather than detach previews itself');
-if (!source.includes("await runtime.teardown();") || !source.includes("finally {\n      preview.removeAttribute('src');\n      preview.hidden = true;\n    }")) {
+if (!source.includes("await runtime.teardown();") || !/finally\s*\{\s*preview\.removeAttribute\('src'\);\s*preview\.hidden = true;\s*\}/.test(source)) {
   throw new Error('browser lab must clear the preview iframe even when adapter teardown fails');
 }
-if (!source.includes("catch (error) {\n      status.dataset.state = 'failed';\n      status.textContent = `Runtime teardown failed: ${error instanceof Error ? error.message : String(error)}`;")) {
+if (!/catch \(error\) \{\s*status\.dataset\.state = 'failed';\s*status\.textContent = `Runtime teardown failed: \$\{error instanceof Error \? error\.message : String\(error\)\}`;/.test(source)) {
   throw new Error('browser lab must report teardown failure after clearing the preview rather than leaving a stale ready state');
 }
-if (!source.includes("teardownButton.disabled = false;\n      return;")) {
+if (!/teardownButton\.disabled = false;\s*return;/.test(source)) {
   throw new Error('browser lab must re-enable teardown after cleanup failure so adapter-owned cleanup can be retried');
 }
 if (source.includes("}, { once: true });")) {
