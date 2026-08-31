@@ -18,6 +18,10 @@ const project = {
     "process.stdin.setEncoding('utf8');",
     "process.stdin.on('data', (chunk) => process.stdout.write(`stdin:${chunk}`));",
   ].join('\n') } },
+  'stall.js': { file: { contents: [
+    "process.stdout.write('stalled\\n');",
+    'setInterval(() => {}, 1_000);',
+  ].join('\n') } },
 };
 
 async function bootRuntime() {
@@ -105,13 +109,16 @@ async function bootRuntime() {
     if (kind === 'open' && port === 3111) status.dataset.portOpen = `${port}:${url}`;
   });
   runtime.on('server-ready', (port, url) => {
-    preview.src = url;
-    preview.hidden = false;
-    status.dataset.runtimeId = runtimeId;
-    status.dataset.state = 'ready';
-    status.textContent = `Ready: in-VM HTTP server on ${port}`;
-    write(`server-ready ${url}`);
-    teardownButton.disabled = false;
+    void proveProcessCancellation(runtime).then(() => {
+      if (runtime.state !== 'ready') return;
+      preview.src = url;
+      preview.hidden = false;
+      status.dataset.runtimeId = runtimeId;
+      status.dataset.state = 'ready';
+      status.textContent = `Ready: in-VM HTTP server on ${port}`;
+      write(`server-ready ${url}`);
+      teardownButton.disabled = false;
+    }).catch(reportRuntimeFailure);
   });
   const process = await runtime.spawn('node', ['server.js']);
   void process.exit.then((code) => { status.dataset.exitCode = String(code); });
@@ -119,6 +126,26 @@ async function bootRuntime() {
     for await (const chunk of process.output) write(chunk);
     status.dataset.outputClosed = 'true';
   })();
+}
+
+async function proveProcessCancellation(runtime: ReturnType<typeof createVivariRuntime>) {
+  const stalled = await runtime.spawn('node', ['stall.js']);
+  stalled.kill();
+  await stalled.exit;
+  for await (const _chunk of stalled.output) {
+    // Draining after kill proves terminal consumers observe stream completion.
+  }
+  const recoveryToken = 'nexari-process-recovery';
+  const recovered = await runtime.spawn('node', ['stdin-echo.js']);
+  const recoveryWriter = recovered.input.getWriter();
+  await recoveryWriter.write(recoveryToken);
+  await recoveryWriter.close();
+  let recoveryOutput = '';
+  for await (const chunk of recovered.output) recoveryOutput += chunk;
+  if (!recoveryOutput.includes(`stdin:${recoveryToken}`)) {
+    throw new Error('Vivari process cancellation recovery proof failed');
+  }
+  status.dataset.killProof = 'killed-exited-output-closed-respawn-ok';
 }
 
 teardownButton.addEventListener('click', async () => {

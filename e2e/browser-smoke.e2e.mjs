@@ -119,6 +119,19 @@ try {
   );
   const previewUrl = await evaluate(`document.querySelector('#preview')?.src`);
   const runtimeId = await evaluate(`document.querySelector('#status')?.dataset.runtimeId`);
+  const cancellationRecovered = await waitFor(() => evaluate(
+    `document.querySelector('#status')?.dataset.killProof === 'killed-exited-output-closed-respawn-ok'`,
+  ));
+  assert.equal(
+    cancellationRecovered,
+    true,
+    'the host must kill a stalled guest process, observe its exit and closed output, then spawn a new process without disturbing preview availability',
+  );
+  assert.deepEqual(
+    await evaluate(`fetch(document.querySelector('#preview').src).then(async (response) => ({ status: response.status, body: await response.text() }))`, true),
+    { status: 200, body: 'Nexari runtime preview OK' },
+    'cancelling a stalled guest process must not disturb the ready preview route',
+  );
 
   await evaluate(`(() => {
     const preview = document.querySelector('#preview');
