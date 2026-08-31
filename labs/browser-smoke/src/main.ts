@@ -146,10 +146,15 @@ async function bootRuntime() {
   await stdinWriter.close();
   let stdinOutput = '';
   for await (const chunk of stdinProcess.output) stdinOutput += chunk;
+  const stdinExitCode = await stdinProcess.exit;
   if (!stdinOutput.includes(`stdin:${stdinToken}`)) {
     throw new Error('Vivari process stdin proof failed');
   }
+  if (stdinExitCode !== 0) {
+    throw new Error(`Vivari process stdin probe exited ${stdinExitCode}`);
+  }
   status.dataset.stdinProof = 'written-echoed';
+  status.dataset.stdinExitProof = 'zero';
   const processOptionsCwd = runtime.workdir;
   const processOptionsToken = 'nexari-process-option';
   const processOptionsArgument = 'nexari-process-argument';

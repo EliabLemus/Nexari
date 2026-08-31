@@ -133,6 +133,11 @@ try {
     'the owned Vivari process bridge must round-trip stdin through a real browser guest before the server starts',
   );
   assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.stdinExitProof`),
+    'zero',
+    'the stdin probe must terminate successfully after the host closes its writer',
+  );
+  assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.processOptionsProof`),
     'cwd-env-args-exit',
     'the owned Vivari process bridge must apply cwd, environment variables and arguments before the server starts',
