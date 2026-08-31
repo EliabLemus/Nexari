@@ -54,5 +54,6 @@ test('unsupported browser-runtime capabilities are explicit', () => {
     ssh: 'unsupported',
     linux_binary: 'unsupported',
     filesystem_watch: 'unsupported',
+    text_search: 'unsupported',
   });
 });

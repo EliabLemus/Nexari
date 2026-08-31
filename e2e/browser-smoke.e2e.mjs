@@ -119,8 +119,8 @@ try {
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.capabilitiesProof`),
-    'native_addons-docker-tcp_remote-udp-ssh-linux_binary-filesystem_watch-unsupported',
-    'the browser lab must surface every unsupported browser-runtime limitation explicitly, including unavailable filesystem watching',
+    'native_addons-docker-tcp_remote-udp-ssh-linux_binary-filesystem_watch-text_search-unsupported',
+    'the browser lab must surface every unsupported browser-runtime limitation explicitly, including unavailable filesystem watching and text search',
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.stdinProof`),
