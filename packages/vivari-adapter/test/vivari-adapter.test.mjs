@@ -853,6 +853,25 @@ test('teardown unsubscribes port listeners so stale port state cannot reach the 
   assert.equal(received, 0);
 });
 
+test('a port close during teardown reaches the host while a port open cannot', async () => {
+  const fake = fakeSdk();
+  let releasePreviewDetach;
+  fake.instance.attachPreview = () => () => new Promise((resolve) => { releasePreviewDetach = resolve; });
+  const runtime = createVivariRuntime({ id: 'tearing-down-port-close', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  runtime.attachPreview({});
+  const received = [];
+  runtime.on('port', (...event) => { received.push(event); });
+  const teardown = runtime.teardown();
+  fake.instance.emitPort(3111, 'open', 'http://preview.test/3111');
+  fake.instance.emitPort(3111, 'close', 'http://preview.test/3111');
+  assert.deepEqual(received, [[3111, 'close', 'http://preview.test/3111']]);
+  releasePreviewDetach();
+  await teardown;
+  assert.equal(fake.calls.teardown, 1);
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('teardown aborts a pending guest boot so lifecycle cleanup cannot hang', async () => {
   let observedSignal;
   const runtime = createVivariRuntime({
