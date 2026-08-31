@@ -4,7 +4,8 @@ export type CapabilityName =
   | 'tcp_remote'
   | 'udp'
   | 'ssh'
-  | 'linux_binary';
+  | 'linux_binary'
+  | 'filesystem_watch';
 
 export type CapabilityState = 'supported' | 'experimental' | 'unsupported';
 export type RuntimeCapabilities = Readonly<Record<CapabilityName, CapabilityState>>;
@@ -17,5 +18,6 @@ export function unsupportedCapabilities(): RuntimeCapabilities {
     udp: 'unsupported',
     ssh: 'unsupported',
     linux_binary: 'unsupported',
+    filesystem_watch: 'unsupported',
   };
 }

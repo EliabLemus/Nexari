@@ -61,7 +61,7 @@ async function bootRuntime() {
   activeRuntime = runtime;
   await runtime.boot();
   const capabilities = runtime.getCapabilities();
-  const unsupportedCapabilityNames = ['native_addons', 'docker', 'tcp_remote', 'udp', 'ssh', 'linux_binary'] as const;
+  const unsupportedCapabilityNames = ['native_addons', 'docker', 'tcp_remote', 'udp', 'ssh', 'linux_binary', 'filesystem_watch'] as const;
   if (unsupportedCapabilityNames.some((name) => capabilities[name] !== 'unsupported')) {
     throw new Error('Vivari browser-runtime limitations must be explicitly unsupported');
   }
