@@ -43,6 +43,11 @@ export interface VivariAdapterOptions {
   loadSdk: () => Promise<VivariSdk>;
 }
 
+// One host preview element can be reused by a fresh runtime after an older
+// runtime's cleanup fails. Generations therefore belong to the element, not a
+// single adapter instance, so a stale cleanup retry cannot clear the new view.
+const previewGenerations = new WeakMap<HTMLIFrameElement, number>();
+
 export function createVivariRuntime(options: VivariAdapterOptions): BrowserRuntime {
   return new NexariVivariRuntime(options);
 }
@@ -71,7 +76,6 @@ class NexariVivariRuntime implements BrowserRuntime {
   #instance: VivariLike | undefined;
   #processes = new Set<RuntimeProcess>();
   #detachPreview = new Set<() => void | PromiseLike<void>>();
-  #previewGenerations = new WeakMap<HTMLIFrameElement, number>();
   #detachEvents = new Set<() => void>();
   #mountAbortControllers = new Set<AbortController>();
   #spawnAbortControllers = new Set<AbortController>();
@@ -365,14 +369,14 @@ class NexariVivariRuntime implements BrowserRuntime {
 
   attachPreview(iframe: HTMLIFrameElement): () => void | PromiseLike<void> {
     const detach = this.#ready().attachPreview(iframe);
-    const generation = (this.#previewGenerations.get(iframe) ?? 0) + 1;
-    this.#previewGenerations.set(iframe, generation);
+    const generation = (previewGenerations.get(iframe) ?? 0) + 1;
+    previewGenerations.set(iframe, generation);
     let active = true;
     let pendingDetach: Promise<void> | undefined;
     const ownedDetach = (): void | PromiseLike<void> => {
       if (!active) return;
       if (pendingDetach) return pendingDetach;
-      if (this.#previewGenerations.get(iframe) === generation) {
+      if (previewGenerations.get(iframe) === generation) {
         // Detaching the relay alone leaves the old document alive in the iframe.
         // Clear it before cleanup so a stale preview cannot outlive this runtime.
         iframe.removeAttribute?.('src');

@@ -1172,3 +1172,35 @@ test('concurrent teardown callers share one cleanup instead of rejecting the lat
   assert.equal(fake.calls.teardown, 1);
   assert.equal(runtime.state, 'terminated');
 });
+
+test('a stale teardown retry cannot clear a newer runtime preview sharing the same iframe', async () => {
+  const first = fakeSdk();
+  let firstDetachAttempts = 0;
+  first.instance.attachPreview = () => () => {
+    firstDetachAttempts++;
+    if (firstDetachAttempts === 1) throw new Error('first preview detach failed once');
+  };
+  const preview = {
+    src: 'http://first.test/preview/3111/',
+    hidden: false,
+    removeAttribute(name) {
+      if (name === 'src') this.src = '';
+    },
+  };
+  const runtimeA = createVivariRuntime({ id: 'stale-preview-owner', isIsolated: () => true, loadSdk: first.loader });
+  await runtimeA.boot();
+  runtimeA.attachPreview(preview);
+  await assert.rejects(runtimeA.teardown(), /first preview detach failed once/);
+
+  const second = fakeSdk();
+  const runtimeB = createVivariRuntime({ id: 'current-preview-owner', isIsolated: () => true, loadSdk: second.loader });
+  await runtimeB.boot();
+  preview.src = 'http://second.test/preview/3111/';
+  runtimeB.attachPreview(preview);
+  preview.hidden = false;
+
+  await runtimeA.teardown();
+  assert.equal(preview.src, 'http://second.test/preview/3111/');
+  assert.equal(preview.hidden, false);
+  await runtimeB.teardown();
+});
