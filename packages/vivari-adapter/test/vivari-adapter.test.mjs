@@ -10,8 +10,15 @@ function fakeSdk() {
   const calls = { boot: 0, mount: 0, spawn: 0, teardown: 0, detach: 0, unsubscribe: 0 };
   Object.defineProperty(calls, 'subscribe', { value: 0, writable: true });
   const listeners = new Map();
+  let watcher;
   const instance = {
-    fs: { readFile: async () => 'ok', writeFile: async () => {}, readdir: async () => [], mkdir: async () => {}, rm: async () => {} },
+    fs: {
+      readFile: async () => 'ok', writeFile: async () => {}, readdir: async () => [], mkdir: async () => {}, rm: async () => {},
+      watch: () => {
+        watcher = { closed: false, close() { this.closed = true; }, [Symbol.asyncIterator]: async function* () {} };
+        return watcher;
+      },
+    },
     mount: async () => { calls.mount++; },
     spawn: async () => { calls.spawn++; return { pid: 41, output: stream, stdout: stream, stderr: stream, input: new WritableStream(), exit: Promise.resolve(0), kill() {} }; },
     on: (event, listener) => {
@@ -21,11 +28,12 @@ function fakeSdk() {
     },
     emitServerReady: (...args) => listeners.get('server-ready')?.(...args),
     emitPort: (...args) => listeners.get('port')?.(...args),
+    emitFsChange: (...args) => listeners.get('fs-change')?.(...args),
     attachPreview: () => () => { calls.detach++; },
     export: async () => ({ files: [], truncated: false }),
     teardown: () => { calls.teardown++; },
   };
-  return { calls, instance, loader: async () => ({ boot: async () => { calls.boot++; return instance; } }) };
+  return { calls, instance, get watcher() { return watcher; }, loader: async () => ({ boot: async () => { calls.boot++; return instance; } }) };
 }
 
 test('rejects without isolation before booting the fork', async () => {
@@ -839,6 +847,32 @@ test('forwards raw port state as a typed runtime event', async () => {
     [3111, 'open', 'http://preview.test/3111'],
     [3111, 'close', 'http://preview.test/3111'],
   ]);
+});
+
+test('forwards filesystem changes as typed runtime events and unsubscribes them on teardown', async () => {
+  const fake = fakeSdk();
+  const runtime = createVivariRuntime({ id: 'filesystem-watch-events', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const received = [];
+  runtime.on('fs-change', (...event) => { received.push(event); });
+  fake.instance.emitFsChange({ kind: 'change', path: '/src/index.js' });
+  assert.deepEqual(received, [[{ kind: 'change', path: '/src/index.js' }]]);
+  await runtime.teardown();
+  fake.instance.emitFsChange({ kind: 'rename', path: '/src/removed.js' });
+  assert.equal(fake.calls.unsubscribe, 1);
+  assert.equal(received.length, 1);
+});
+
+test('teardown closes adapter-owned filesystem watchers before tearing down the guest', async () => {
+  const fake = fakeSdk();
+  const runtime = createVivariRuntime({ id: 'filesystem-watch-teardown', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const watcher = runtime.fs.watch('/src');
+  assert.equal(watcher.closed, false);
+  await runtime.teardown();
+  assert.equal(fake.watcher.closed, true);
+  assert.equal(watcher.closed, true);
+  assert.equal(fake.calls.teardown, 1);
 });
 
 test('teardown unsubscribes port listeners so stale port state cannot reach the host', async () => {

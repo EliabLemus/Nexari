@@ -45,7 +45,7 @@ test('lifecycle only permits idempotent teardown after termination', () => {
   assert.throws(() => lifecycle.beginBoot(), (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
 });
 
-test('unsupported browser-runtime capabilities are explicit', () => {
+test('browser-runtime capabilities explicitly disclose the experimental filesystem watcher', () => {
   assert.deepEqual(unsupportedCapabilities(), {
     native_addons: 'unsupported',
     docker: 'unsupported',
@@ -53,7 +53,7 @@ test('unsupported browser-runtime capabilities are explicit', () => {
     udp: 'unsupported',
     ssh: 'unsupported',
     linux_binary: 'unsupported',
-    filesystem_watch: 'unsupported',
+    filesystem_watch: 'experimental',
     text_search: 'unsupported',
   });
 });

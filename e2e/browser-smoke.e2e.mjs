@@ -103,6 +103,11 @@ try {
     'the owned Vivari filesystem bridge must complete a text CRUD round-trip before the server starts',
   );
   assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.fsWatchProof`),
+    'path-watch-write-event-close',
+    'the owned Vivari filesystem bridge must report a path watch event and allow the watcher to close before the server starts',
+  );
+  assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.fsBinaryProof`),
     'write-bytes-read-bytes-rm',
     'the owned Vivari filesystem bridge must round-trip binary payloads byte-for-byte before the server starts',
@@ -119,8 +124,8 @@ try {
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.capabilitiesProof`),
-    'native_addons-docker-tcp_remote-udp-ssh-linux_binary-filesystem_watch-text_search-unsupported',
-    'the browser lab must surface every unsupported browser-runtime limitation explicitly, including unavailable filesystem watching and text search',
+    'native_addons-docker-tcp_remote-udp-ssh-linux_binary-text_search-unsupported-filesystem_watch-experimental',
+    'the browser lab must surface unsupported browser-runtime limitations explicitly and disclose filesystem watching as experimental',
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.stdinProof`),

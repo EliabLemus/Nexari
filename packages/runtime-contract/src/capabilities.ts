@@ -19,7 +19,7 @@ export function unsupportedCapabilities(): RuntimeCapabilities {
     udp: 'unsupported',
     ssh: 'unsupported',
     linux_binary: 'unsupported',
-    filesystem_watch: 'unsupported',
+    filesystem_watch: 'experimental',
     text_search: 'unsupported',
   };
 }

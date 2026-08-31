@@ -61,11 +61,14 @@ async function bootRuntime() {
   activeRuntime = runtime;
   await runtime.boot();
   const capabilities = runtime.getCapabilities();
-  const unsupportedCapabilityNames = ['native_addons', 'docker', 'tcp_remote', 'udp', 'ssh', 'linux_binary', 'filesystem_watch', 'text_search'] as const;
+  const unsupportedCapabilityNames = ['native_addons', 'docker', 'tcp_remote', 'udp', 'ssh', 'linux_binary', 'text_search'] as const;
   if (unsupportedCapabilityNames.some((name) => capabilities[name] !== 'unsupported')) {
     throw new Error('Vivari browser-runtime limitations must be explicitly unsupported');
   }
-  status.dataset.capabilitiesProof = `${unsupportedCapabilityNames.join('-')}-unsupported`;
+  if (capabilities.filesystem_watch !== 'experimental') {
+    throw new Error('Vivari filesystem watching must be explicitly experimental until its browser proof passes');
+  }
+  status.dataset.capabilitiesProof = `${unsupportedCapabilityNames.join('-')}-unsupported-filesystem_watch-experimental`;
   runtime.attachPreview(preview);
   await runtime.mount(project);
   const instanceMarkerPath = 'nexari-runtime-instance-marker.txt';
@@ -86,6 +89,21 @@ async function bootRuntime() {
     throw new Error('Vivari filesystem CRUD proof failed');
   }
   status.dataset.fsProof = 'write-read-readdir-rm-readdir';
+  const fsWatchProofPath = '/nexari-fs-watch-proof.txt';
+  let resolveFsWatch: ((event: { kind: 'rename' | 'change'; path: string }) => void) | undefined;
+  const fsWatchEvent = new Promise<{ kind: 'rename' | 'change'; path: string }>((resolve) => { resolveFsWatch = resolve; });
+  const fsWatcher = runtime.fs.watch(fsWatchProofPath, (event) => { resolveFsWatch?.(event); });
+  await runtime.fs.writeFile(fsWatchProofPath, 'Nexari filesystem watch proof');
+  const watchedChange = await Promise.race([
+    fsWatchEvent,
+    new Promise<undefined>((resolve) => setTimeout(resolve, 5_000)),
+  ]);
+  fsWatcher.close();
+  await runtime.fs.rm(fsWatchProofPath);
+  if (!watchedChange || watchedChange.path !== fsWatchProofPath || !['rename', 'change'].includes(watchedChange.kind)) {
+    throw new Error('Vivari filesystem watch proof failed');
+  }
+  status.dataset.fsWatchProof = 'path-watch-write-event-close';
   const fsBinaryProofPath = '/nexari-fs-proof.bin';
   const fsBinaryPayload = new Uint8Array([0, 1, 127, 128, 254, 255]);
   await runtime.fs.writeFile(fsBinaryProofPath, fsBinaryPayload);

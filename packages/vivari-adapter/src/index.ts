@@ -6,6 +6,8 @@ import {
   type RuntimeCapabilities,
   type RuntimeBootOptions,
   type RuntimeFileSystem,
+  type RuntimeFsChangeEvent,
+  type RuntimeFsWatcher,
   type RuntimeProcess,
   type RuntimeEventMap,
 } from '../../runtime-contract/dist/index.js';
@@ -19,12 +21,14 @@ export interface VivariLike {
     readdir(path: string): Promise<string[]>;
     mkdir(path: string, options?: { recursive?: boolean }): Promise<void>;
     rm(path: string, options?: { recursive?: boolean; force?: boolean }): Promise<void>;
+    watch(path: string, listener?: (event: RuntimeFsChangeEvent) => void): RuntimeFsWatcher;
   };
   mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void>;
   spawn(command: string, args?: string[], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess>;
   attachPreview(iframe: HTMLIFrameElement): () => void | PromiseLike<void>;
   on(event: 'server-ready', listener: (port: number, url: string) => void): () => void;
   on(event: 'port', listener: (port: number, kind: 'open' | 'close', url: string) => void): () => void;
+  on(event: 'fs-change', listener: (event: RuntimeFsChangeEvent) => void): () => void;
   export(path?: string): Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>;
   teardown(): void | Promise<void>;
 }
@@ -78,6 +82,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   #writeFilePromises = new Set<Promise<void>>();
   #mkdirPromises = new Set<Promise<void>>();
   #rmPromises = new Set<Promise<void>>();
+  #watchers = new Set<RuntimeFsWatcher>();
   #exportPromises = new Set<Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>>();
   #bootPromise: Promise<void> | undefined;
   #guestBootPromise: Promise<VivariLike> | undefined;
@@ -156,6 +161,21 @@ class NexariVivariRuntime implements BrowserRuntime {
         } finally {
           this.#rmPromises.delete(rmPromise);
         }
+      },
+      watch: (path, listener) => {
+        const watcher = this.#ready().fs.watch(path, (event) => {
+          if (this.state === 'ready') listener?.(event);
+        });
+        const ownedWatcher: RuntimeFsWatcher = {
+          get closed() { return watcher.closed; },
+          close: () => {
+            watcher.close();
+            this.#watchers.delete(ownedWatcher);
+          },
+          [Symbol.asyncIterator]: () => watcher[Symbol.asyncIterator](),
+        };
+        this.#watchers.add(ownedWatcher);
+        return ownedWatcher;
       },
     };
   }
@@ -394,6 +414,11 @@ class NexariVivariRuntime implements BrowserRuntime {
         }
       };
       detach = instance.on('port', forwardIfReady);
+    } else if (event === 'fs-change') {
+      const forwardIfReady = (change: RuntimeFsChangeEvent) => {
+        if (this.state === 'ready') (listener as (event: RuntimeFsChangeEvent) => void)(change);
+      };
+      detach = instance.on('fs-change', forwardIfReady);
     } else {
       throw new RuntimeError('UNSUPPORTED_CAPABILITY', `Unsupported event ${String(event)}`);
     }
@@ -468,6 +493,7 @@ class NexariVivariRuntime implements BrowserRuntime {
       }
     }
     for (const detach of [...this.#detachPreview]) await cleanUp(detach);
+    for (const watcher of [...this.#watchers]) await cleanUp(() => watcher.close());
     const instance = this.#instance;
     if (instance) {
       try {

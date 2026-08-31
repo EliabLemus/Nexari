@@ -13,6 +13,17 @@ export interface RuntimeFileSystem {
   readdir(path: string): Promise<string[]>;
   mkdir(path: string, options?: { recursive?: boolean }): Promise<void>;
   rm(path: string, options?: { recursive?: boolean; force?: boolean }): Promise<void>;
+  watch(path: string, listener?: (event: RuntimeFsChangeEvent) => void): RuntimeFsWatcher;
+}
+
+export interface RuntimeFsChangeEvent {
+  kind: 'rename' | 'change';
+  path: string;
+}
+
+export interface RuntimeFsWatcher extends AsyncIterable<RuntimeFsChangeEvent> {
+  close(): void;
+  readonly closed: boolean;
 }
 
 export interface RuntimeProcess {
@@ -28,6 +39,7 @@ export interface RuntimeProcess {
 export type RuntimeEventMap = {
   'server-ready': [port: number, url: string];
   'port': [port: number, kind: 'open' | 'close', url: string];
+  'fs-change': [event: RuntimeFsChangeEvent];
 };
 
 /**
