@@ -32,6 +32,8 @@ export type RuntimeEventMap = {
 
 export interface BrowserRuntime {
   readonly id: string;
+  /** Stable absolute guest directory for host path translation and process cwd defaults. */
+  readonly workdir: string;
   readonly state: RuntimeState;
   readonly fs: RuntimeFileSystem;
   boot(options?: { signal?: AbortSignal }): Promise<void>;

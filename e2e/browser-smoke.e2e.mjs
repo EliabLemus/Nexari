@@ -75,6 +75,11 @@ try {
     'fresh-before-write',
     'a newly booted Vivari runtime must not inherit a filesystem marker from a prior runtime instance',
   );
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.workdirProof`),
+    'root-cwd-observed',
+    'the owned adapter must expose a stable workdir that a real guest process observes as its cwd',
+  );
   const resourceOrigins = await evaluate(`Array.from(new Set(performance.getEntriesByType('resource').map(({ name }) => new URL(name).origin)))`);
   assert.deepEqual(resourceOrigins, [new URL(labUrl).origin], 'browser runtime assets must load only from the controlled lab origin');
   assert.equal(await evaluate(`document.querySelector('#preview')?.hidden`), false, 'preview must be visible only after server-ready');

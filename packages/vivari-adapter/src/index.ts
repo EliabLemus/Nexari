@@ -60,6 +60,7 @@ export async function resetPinnedVivariVfs(): Promise<boolean> {
 
 class NexariVivariRuntime implements BrowserRuntime {
   readonly id: string;
+  readonly workdir = '/';
   readonly fs: RuntimeFileSystem;
   #lifecycle = new RuntimeLifecycle();
   #instance: VivariLike | undefined;

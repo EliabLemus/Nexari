@@ -118,18 +118,16 @@ async function bootRuntime() {
     throw new Error('Vivari process stdin proof failed');
   }
   status.dataset.stdinProof = 'written-echoed';
-  const processOptionsCwd = '/nexari-process-options';
+  const processOptionsCwd = runtime.workdir;
   const processOptionsToken = 'nexari-process-option';
   const processOptionsArgument = 'nexari-process-argument';
-  await runtime.fs.mkdir(processOptionsCwd);
-  const processOptions = await runtime.spawn('node', ['../process-options.js', processOptionsArgument], {
+  const processOptions = await runtime.spawn('node', ['process-options.js', processOptionsArgument], {
     cwd: processOptionsCwd,
     env: { NEXARI_PROCESS_OPTION: processOptionsToken },
   });
   let processOptionsOutput = '';
   for await (const chunk of processOptions.output) processOptionsOutput += chunk;
   const processOptionsExit = await processOptions.exit;
-  await runtime.fs.rm(processOptionsCwd, { recursive: true });
   const observedProcessOptions = JSON.parse(processOptionsOutput);
   if (processOptionsExit !== 0
     || observedProcessOptions.cwd !== processOptionsCwd
@@ -138,6 +136,10 @@ async function bootRuntime() {
     throw new Error('Vivari process cwd, environment or argument proof failed');
   }
   status.dataset.processOptionsProof = 'cwd-env-args-exit';
+  if (runtime.workdir !== '/' || observedProcessOptions.cwd !== runtime.workdir) {
+    throw new Error('Vivari stable workdir proof failed');
+  }
+  status.dataset.workdirProof = 'root-cwd-observed';
   runtime.on('port', (port, kind, url) => {
     if (port !== 3111) return;
     if (kind === 'open') status.dataset.portOpen = `${port}:${url}`;
