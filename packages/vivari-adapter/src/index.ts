@@ -55,6 +55,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   #instance: VivariLike | undefined;
   #processes = new Set<RuntimeProcess>();
   #detachPreview = new Set<() => void | PromiseLike<void>>();
+  #previewGenerations = new WeakMap<HTMLIFrameElement, number>();
   #detachEvents = new Set<() => void>();
   #mountAbortControllers = new Set<AbortController>();
   #spawnAbortControllers = new Set<AbortController>();
@@ -313,15 +314,19 @@ class NexariVivariRuntime implements BrowserRuntime {
 
   attachPreview(iframe: HTMLIFrameElement): () => void | PromiseLike<void> {
     const detach = this.#ready().attachPreview(iframe);
+    const generation = (this.#previewGenerations.get(iframe) ?? 0) + 1;
+    this.#previewGenerations.set(iframe, generation);
     let active = true;
     let pendingDetach: Promise<void> | undefined;
     const ownedDetach = (): void | PromiseLike<void> => {
       if (!active) return;
       if (pendingDetach) return pendingDetach;
-      // Detaching the relay alone leaves the old document alive in the iframe.
-      // Clear it before cleanup so a stale preview cannot outlive this runtime.
-      iframe.removeAttribute?.('src');
-      iframe.hidden = true;
+      if (this.#previewGenerations.get(iframe) === generation) {
+        // Detaching the relay alone leaves the old document alive in the iframe.
+        // Clear it before cleanup so a stale preview cannot outlive this runtime.
+        iframe.removeAttribute?.('src');
+        iframe.hidden = true;
+      }
       const result = detach();
       if (result && typeof (result as PromiseLike<void>).then === 'function') {
         pendingDetach = Promise.resolve(result).then(

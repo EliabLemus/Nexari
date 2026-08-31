@@ -245,6 +245,29 @@ test('teardown clears an attached preview source so a stale document cannot outl
   assert.equal(fake.calls.detach, 1);
 });
 
+test('detaching a superseded preview attachment cannot clear a newer preview document', async () => {
+  const fake = fakeSdk();
+  const preview = {
+    src: 'http://first.test/preview/3111/',
+    hidden: false,
+    removeAttribute(name) {
+      if (name === 'src') this.src = '';
+    },
+  };
+  const runtime = createVivariRuntime({ id: 'superseded-preview-detach', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const firstDetach = runtime.attachPreview(preview);
+  preview.src = 'http://second.test/preview/3111/';
+  runtime.attachPreview(preview);
+  firstDetach();
+  assert.equal(preview.src, 'http://second.test/preview/3111/');
+  assert.equal(preview.hidden, false);
+  await runtime.teardown();
+  assert.equal(preview.src, '');
+  assert.equal(preview.hidden, true);
+  assert.equal(fake.calls.detach, 2);
+});
+
 test('teardown kills a process already returned to the host before tearing down the guest', async () => {
   const fake = fakeSdk();
   let kills = 0;
