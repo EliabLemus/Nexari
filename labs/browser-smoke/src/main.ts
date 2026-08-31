@@ -38,6 +38,20 @@ async function bootRuntime() {
   status.textContent = 'Booting pinned Vivari runtime…';
   teardownButton.disabled = true;
   rebootButton.disabled = true;
+  const unsupportedOptionsRuntime = createVivariRuntime({
+    id: crypto.randomUUID(),
+    loadSdk: async () => { throw new Error('Unsupported boot options must reject before loading Vivari'); },
+  });
+  try {
+    await unsupportedOptionsRuntime.boot({ coep: 'credentialless' });
+    throw new Error('Vivari adapter accepted an unsupported host boot option');
+  } catch (error) {
+    if (!(error instanceof Error) || (error as { code?: unknown }).code !== 'UNSUPPORTED_CAPABILITY'
+      || unsupportedOptionsRuntime.state !== 'created') {
+      throw error;
+    }
+  }
+  status.dataset.unsupportedBootOptionProof = 'coep-rejected-before-sdk-load';
   // This lab proves independent, short-lived runtime instances. Vivari's default
   // OPFS mirror is intentionally durable, so clear only this controlled lab's
   // origin-scoped state before constructing each fresh instance.

@@ -35,6 +35,36 @@ test('rejects without isolation before booting the fork', async () => {
   assert.equal(fake.calls.boot, 0);
 });
 
+test('rejects unsupported host boot options before loading the Vivari SDK and remains retryable', async () => {
+  for (const [option, value] of [
+    ['coep', 'credentialless'],
+    ['workdirName', 'project'],
+    ['forwardPreviewErrors', true],
+  ]) {
+    const fake = fakeSdk();
+    let sdkLoads = 0;
+    const runtime = createVivariRuntime({
+      id: `unsupported-boot-option-${option}`,
+      isIsolated: () => true,
+      loadSdk: async () => {
+        sdkLoads++;
+        return { boot: async () => fake.instance };
+      },
+    });
+    await assert.rejects(
+      runtime.boot({ [option]: value }),
+      (error) => error instanceof RuntimeError
+        && error.code === 'UNSUPPORTED_CAPABILITY'
+        && error.message === `Unsupported boot option: ${option}`,
+    );
+    assert.equal(sdkLoads, 0);
+    assert.equal(runtime.state, 'created');
+    await runtime.boot();
+    assert.equal(sdkLoads, 1);
+    await runtime.teardown();
+  }
+});
+
 test('boot after teardown rejects as torn down before evaluating isolation', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'terminated-before-boot', isIsolated: () => false, loadSdk: fake.loader });

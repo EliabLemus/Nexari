@@ -71,6 +71,11 @@ try {
   assert.equal(ready, true, `browser lab never reached server-ready state:\n${previewOutput}`);
   assert.equal(await evaluate('crossOriginIsolated'), true, 'guest runtime must start only in an isolated browser context');
   assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.unsupportedBootOptionProof`),
+    'coep-rejected-before-sdk-load',
+    'an unsupported host boot option must reject in the browser before the Vivari SDK can load a guest',
+  );
+  assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.fsInstanceIsolation`),
     'fresh-before-write',
     'a newly booted Vivari runtime must not inherit a filesystem marker from a prior runtime instance',

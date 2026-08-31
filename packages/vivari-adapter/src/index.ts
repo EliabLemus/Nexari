@@ -4,6 +4,7 @@ import {
   unsupportedCapabilities,
   type BrowserRuntime,
   type RuntimeCapabilities,
+  type RuntimeBootOptions,
   type RuntimeFileSystem,
   type RuntimeProcess,
   type RuntimeEventMap,
@@ -161,8 +162,13 @@ class NexariVivariRuntime implements BrowserRuntime {
 
   get state() { return this.#lifecycle.state; }
 
-  boot({ signal }: { signal?: AbortSignal } = {}): Promise<void> {
+  boot(options?: RuntimeBootOptions): Promise<void> {
     if (this.#isTornDown()) return Promise.reject(new RuntimeError('TORN_DOWN', 'Runtime has been torn down'));
+    const unsupportedOption = unsupportedBootOption(options);
+    if (unsupportedOption) {
+      return Promise.reject(new RuntimeError('UNSUPPORTED_CAPABILITY', `Unsupported boot option: ${unsupportedOption}`));
+    }
+    const { signal } = options ?? {};
     if (!this.#bootPromise) this.#bootPromise = this.#boot(signal);
     return this.#bootPromise;
   }
@@ -497,4 +503,12 @@ function defaultIsolation(): boolean {
 
 function isVivariCommandNotFound(cause: unknown): cause is Error & { code: 'ERR_COMMAND_NOT_FOUND' } {
   return cause instanceof Error && (cause as { code?: unknown }).code === 'ERR_COMMAND_NOT_FOUND';
+}
+
+function unsupportedBootOption(options?: RuntimeBootOptions): 'coep' | 'workdirName' | 'forwardPreviewErrors' | undefined {
+  if (!options) return undefined;
+  for (const option of ['coep', 'workdirName', 'forwardPreviewErrors'] as const) {
+    if (Object.hasOwn(options, option)) return option;
+  }
+  return undefined;
 }

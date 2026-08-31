@@ -30,13 +30,25 @@ export type RuntimeEventMap = {
   'port': [port: number, kind: 'open' | 'close', url: string];
 };
 
+/**
+ * Public host boot options mirrored from the observed WebContainer call site.
+ * They remain typed so unsupported requests can fail explicitly instead of
+ * being silently dropped by a browser-runtime adapter.
+ */
+export interface RuntimeBootOptions {
+  signal?: AbortSignal;
+  coep?: 'credentialless';
+  workdirName?: string;
+  forwardPreviewErrors?: boolean;
+}
+
 export interface BrowserRuntime {
   readonly id: string;
   /** Stable absolute guest directory for host path translation and process cwd defaults. */
   readonly workdir: string;
   readonly state: RuntimeState;
   readonly fs: RuntimeFileSystem;
-  boot(options?: { signal?: AbortSignal }): Promise<void>;
+  boot(options?: RuntimeBootOptions): Promise<void>;
   mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void>;
   spawn(command: string, args?: string[], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess>;
   attachPreview(iframe: HTMLIFrameElement): () => void | PromiseLike<void>;
