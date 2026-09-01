@@ -133,6 +133,11 @@ try {
     'the owned Vivari export bridge must round-trip mounted files byte-exact without truncation before the server starts',
   );
   assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.fsExportNestedProof`),
+    'nested-path-byte-exact',
+    'the owned Vivari export bridge must recursively preserve a nested project file byte-exact before the server starts',
+  );
+  assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.capabilitiesProof`),
     'native_addons-docker-tcp_remote-udp-ssh-linux_binary-permission_changes-symlinks-text_search-unsupported-filesystem_watch-experimental',
     'the browser lab must explicitly disclose unsupported native, permission-change and symlink capabilities while filesystem watching remains experimental',

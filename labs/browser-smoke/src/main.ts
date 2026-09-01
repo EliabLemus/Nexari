@@ -138,6 +138,11 @@ async function bootRuntime() {
     throw new Error('Vivari nested directory lifecycle proof failed');
   }
   status.dataset.fsMkdirProof = 'mkdir-p-readdir-write-rm-recursive-readdir';
+  const nestedExportDirectory = '/nexari-export-proof/nested';
+  const nestedExportPath = `${nestedExportDirectory}/deep.bin`;
+  const nestedExportPayload = new Uint8Array([7, 42, 128, 255]);
+  await runtime.fs.mkdir(nestedExportDirectory, { recursive: true });
+  await runtime.fs.writeFile(nestedExportPath, nestedExportPayload);
   const snapshot = await runtime.export('/');
   const exportedContents = new Map(snapshot.files.map(({ path, contents }) => [path, contents]));
   for (const [path, expectedContents] of Object.entries({
@@ -149,8 +154,16 @@ async function bootRuntime() {
       throw new Error(`Vivari export proof failed for ${path}`);
     }
   }
+  const nestedExportedContents = exportedContents.get('nexari-export-proof/nested/deep.bin');
+  if (!(nestedExportedContents instanceof Uint8Array)
+    || nestedExportedContents.length !== nestedExportPayload.length
+    || nestedExportedContents.some((byte, index) => byte !== nestedExportPayload[index])) {
+    throw new Error('Vivari recursive export proof failed for nested project file');
+  }
+  await runtime.fs.rm('/nexari-export-proof', { recursive: true });
   if (snapshot.truncated) throw new Error('Vivari export proof unexpectedly truncated the project snapshot');
   status.dataset.fsExportProof = 'export-byte-exact-truncated-false';
+  status.dataset.fsExportNestedProof = 'nested-path-byte-exact';
   const stdinToken = 'nexari-stdin-round-trip';
   const stdinProcess = await runtime.spawn('node', ['stdin-echo.js']);
   const stdinWriter = stdinProcess.input.getWriter();
