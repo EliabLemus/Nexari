@@ -167,6 +167,15 @@ try {
     { status: 200, body: 'Nexari runtime preview OK' },
     'cancelling a stalled guest process must not disturb the ready preview route',
   );
+  await evaluate('window.__nexariProvePreviewRecovery?.()', true);
+  const previewRecovered = await waitFor(() => evaluate(
+    `document.querySelector('#status')?.dataset.previewRecoveryProof === 'killed-port-close-respawn-server-ready-fetch-200'`,
+  ));
+  assert.equal(
+    previewRecovered,
+    true,
+    'a live preview server must report its port close, then recover with a fresh server-ready response without tearing down the runtime',
+  );
 
   await evaluate(`(() => {
     const preview = document.querySelector('#preview');

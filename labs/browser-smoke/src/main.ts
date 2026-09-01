@@ -6,6 +6,7 @@ const preview = document.querySelector<HTMLIFrameElement>('#preview')!;
 const teardownButton = document.querySelector<HTMLButtonElement>('#teardown')!;
 const rebootButton = document.querySelector<HTMLButtonElement>('#reboot')!;
 let activeRuntime: ReturnType<typeof createVivariRuntime> | undefined;
+let serverProcess: Awaited<ReturnType<ReturnType<typeof createVivariRuntime>['spawn']>> | undefined;
 
 const write = (line: string) => { output.textContent += `${line}\n`; };
 const project = {
@@ -57,6 +58,7 @@ async function bootRuntime() {
   // origin-scoped state before constructing each fresh instance.
   await resetPinnedVivariVfs();
   const runtimeId = crypto.randomUUID();
+  let initialServerReady = true;
   const runtime = createVivariRuntime({ id: runtimeId, loadSdk: loadPinnedVivariSdk });
   activeRuntime = runtime;
   await runtime.boot();
@@ -183,6 +185,8 @@ async function bootRuntime() {
     if (kind === 'close') status.dataset.portClose = `${port}:${url}`;
   });
   runtime.on('server-ready', (port, url) => {
+    if (!initialServerReady) return;
+    initialServerReady = false;
     void proveProcessCancellation(runtime).then(async () => {
       if (runtime.state !== 'ready') return;
       const response = await fetch(url);
@@ -199,12 +203,17 @@ async function bootRuntime() {
       status.textContent = `Ready: in-VM HTTP server on ${port}`;
       write(`server-ready ${url}`);
       teardownButton.disabled = false;
+      (globalThis as typeof globalThis & { __nexariProvePreviewRecovery?: () => Promise<void> }).__nexariProvePreviewRecovery =
+        () => provePreviewRecovery(runtime).catch((error) => {
+          reportRuntimeFailure(error);
+          throw error;
+        });
     }).catch(reportRuntimeFailure);
   });
-  const process = await runtime.spawn('node', ['server.js']);
-  void process.exit.then((code) => { status.dataset.exitCode = String(code); });
+  serverProcess = await runtime.spawn('node', ['server.js']);
+  void serverProcess.exit.then((code) => { status.dataset.exitCode = String(code); });
   void (async () => {
-    for await (const chunk of process.output) write(chunk);
+    for await (const chunk of serverProcess!.output) write(chunk);
     status.dataset.outputClosed = 'true';
   })();
 }
@@ -227,6 +236,59 @@ async function proveProcessCancellation(runtime: ReturnType<typeof createVivariR
     throw new Error('Vivari process cancellation recovery proof failed');
   }
   status.dataset.killProof = 'killed-exited-output-closed-respawn-ok';
+}
+
+async function provePreviewRecovery(runtime: ReturnType<typeof createVivariRuntime>) {
+  const staleServer = serverProcess;
+  if (!staleServer || runtime.state !== 'ready') return;
+  delete status.dataset.portClose;
+  staleServer.kill();
+  await staleServer.exit;
+  const portClosed = await waitFor(() => status.dataset.portClose === '3111:/preview/3111/');
+  if (!portClosed || runtime.state !== 'ready') {
+    throw new Error('Vivari preview server did not report its port closing before recovery');
+  }
+  const recoveredReady = new Promise<string>((resolve) => {
+    const detach = runtime.on('server-ready', (port, url) => {
+      if (port !== 3111) return;
+      detach();
+      resolve(url);
+    });
+  });
+  serverProcess = await runtime.spawn('node', ['server.js']);
+  void serverProcess.exit.then((code) => { status.dataset.exitCode = String(code); });
+  void (async () => {
+    for await (const chunk of serverProcess!.output) write(chunk);
+    status.dataset.outputClosed = 'true';
+  })();
+  const url = await Promise.race([
+    recoveredReady,
+    new Promise<never>((_, reject) => setTimeout(
+      () => reject(new Error('Vivari preview server recovery never reached server-ready')),
+      15_000,
+    )),
+  ]);
+  const response = await fetch(url);
+  const body = await response.text();
+  if (!response.ok || body !== 'Nexari runtime preview OK' || runtime.state !== 'ready') {
+    throw new Error('Vivari preview server recovery did not expose a fresh usable response');
+  }
+  preview.src = url;
+  status.dataset.previewRecoveryProof = 'killed-port-close-respawn-server-ready-fetch-200';
+  // The teardown assertions must observe the replacement process, not the
+  // intentionally killed server that established this recovery proof.
+  delete status.dataset.portClose;
+  delete status.dataset.exitCode;
+  delete status.dataset.outputClosed;
+}
+
+async function waitFor(check: () => boolean, timeoutMs = 5_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (check()) return true;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return false;
 }
 
 teardownButton.addEventListener('click', async () => {

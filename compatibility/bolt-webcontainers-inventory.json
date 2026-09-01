@@ -148,8 +148,8 @@
       "category": "preview-recovery",
       "statement": "Preview state must reflect a fresh server response and cleanly recover from stale routes.",
       "bolt_source": "Bolt issue #2140; app/lib/stores/previews.ts:169-208",
-      "proof": "e2e/preview-recovery.spec.ts",
-      "nexari_status": "unknown"
+      "proof": "e2e/browser-smoke.e2e.mjs (kill live server, port close, respawn, fresh 200 response)",
+      "nexari_status": "proven"
     },
     {
       "id": "BOLT-WC-017",
