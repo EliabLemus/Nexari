@@ -183,8 +183,15 @@ async function bootRuntime() {
     if (kind === 'close') status.dataset.portClose = `${port}:${url}`;
   });
   runtime.on('server-ready', (port, url) => {
-    void proveProcessCancellation(runtime).then(() => {
+    void proveProcessCancellation(runtime).then(async () => {
       if (runtime.state !== 'ready') return;
+      const response = await fetch(url);
+      const body = await response.text();
+      if (!response.ok || body !== 'Nexari runtime preview OK') {
+        throw new Error('Vivari server-ready event did not expose a usable preview response');
+      }
+      if (runtime.state !== 'ready') return;
+      status.dataset.serverReadyResponseProof = 'response-200-before-preview';
       preview.src = url;
       preview.hidden = false;
       status.dataset.runtimeId = runtimeId;

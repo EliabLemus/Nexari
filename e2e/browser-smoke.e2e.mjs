@@ -88,6 +88,11 @@ try {
   const resourceOrigins = await evaluate(`Array.from(new Set(performance.getEntriesByType('resource').map(({ name }) => new URL(name).origin)))`);
   assert.deepEqual(resourceOrigins, [new URL(labUrl).origin], 'browser runtime assets must load only from the controlled lab origin');
   assert.equal(await evaluate(`document.querySelector('#preview')?.hidden`), false, 'preview must be visible only after server-ready');
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.serverReadyResponseProof`),
+    'response-200-before-preview',
+    'server-ready must not expose a preview until the host has observed a usable in-VM HTTP response',
+  );
   assert.match(await evaluate(`document.querySelector('#preview')?.src`), /^http:\/\//, 'preview must have a runtime URL');
   assert.deepEqual(
     await evaluate(`fetch(document.querySelector('#preview').src).then(async (response) => ({
