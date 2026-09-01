@@ -30,8 +30,18 @@ const project = {
 
 async function bootRuntime() {
   if (!crossOriginIsolated || typeof SharedArrayBuffer === 'undefined') {
+    const runtime = createVivariRuntime({ id: crypto.randomUUID(), loadSdk: loadPinnedVivariSdk });
+    try {
+      await runtime.boot();
+      throw new Error('Vivari adapter booted without the browser isolation prerequisite');
+    } catch (error) {
+      if (!(error instanceof Error) || (error as { code?: unknown }).code !== 'ISOLATION_REQUIRED') {
+        throw error;
+      }
+    }
     status.dataset.state = 'isolation-failed';
     status.dataset.errorCode = 'ISOLATION_REQUIRED';
+    status.dataset.isolationAdapterProof = 'adapter-rejected-before-sdk-load';
     status.textContent = 'Isolation prerequisite failed';
     return;
   }

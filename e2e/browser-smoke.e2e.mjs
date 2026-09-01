@@ -61,6 +61,11 @@ try {
   assert.equal(await evaluate('crossOriginIsolated'), false, 'the negative browser proof must run without cross-origin isolation');
   assert.equal(await evaluate(`document.querySelector('#status')?.dataset.errorCode`), 'ISOLATION_REQUIRED', 'the host must surface the typed isolation failure');
   assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.isolationAdapterProof`),
+    'adapter-rejected-before-sdk-load',
+    'the negative browser proof must invoke the actual adapter and reject before loading the Vivari SDK',
+  );
+  assert.equal(
     await evaluate(`performance.getEntriesByType('resource').some(({ name }) => /\\/assets\\/dist-/.test(new URL(name).pathname))`),
     false,
     'a non-isolated browser context must not load the dynamically imported Vivari SDK chunk',
