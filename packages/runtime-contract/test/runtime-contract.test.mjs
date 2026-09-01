@@ -53,6 +53,8 @@ test('browser-runtime capabilities explicitly disclose the experimental filesyst
     udp: 'unsupported',
     ssh: 'unsupported',
     linux_binary: 'unsupported',
+    permission_changes: 'unsupported',
+    symlinks: 'unsupported',
     filesystem_watch: 'experimental',
     text_search: 'unsupported',
   });

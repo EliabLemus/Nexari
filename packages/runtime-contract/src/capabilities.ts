@@ -5,6 +5,8 @@ export type CapabilityName =
   | 'udp'
   | 'ssh'
   | 'linux_binary'
+  | 'permission_changes'
+  | 'symlinks'
   | 'filesystem_watch'
   | 'text_search';
 
@@ -19,6 +21,8 @@ export function unsupportedCapabilities(): RuntimeCapabilities {
     udp: 'unsupported',
     ssh: 'unsupported',
     linux_binary: 'unsupported',
+    permission_changes: 'unsupported',
+    symlinks: 'unsupported',
     filesystem_watch: 'experimental',
     text_search: 'unsupported',
   };
