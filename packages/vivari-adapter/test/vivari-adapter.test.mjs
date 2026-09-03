@@ -128,6 +128,26 @@ test('rejects a StackBlitz preview origin before loading the owned Vivari SDK', 
   assert.equal(runtime.state, 'created');
 });
 
+test('rejects an invalid preview origin before loading the owned Vivari SDK', async () => {
+  let sdkLoads = 0;
+  const runtime = createVivariRuntime({
+    id: 'invalid-preview-origin',
+    isIsolated: () => true,
+    loadSdk: async () => {
+      sdkLoads++;
+      throw new Error('SDK must not load');
+    },
+  });
+  await assert.rejects(
+    runtime.boot({ previewOrigin: 'not a URL' }),
+    (error) => error instanceof RuntimeError
+      && error.code === 'UNSUPPORTED_CAPABILITY'
+      && error.message === 'Preview origin must be an absolute URL.',
+  );
+  assert.equal(sdkLoads, 0);
+  assert.equal(runtime.state, 'created');
+});
+
 test('boot after teardown rejects as torn down before evaluating isolation', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'terminated-before-boot', isIsolated: () => false, loadSdk: fake.loader });
