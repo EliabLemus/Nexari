@@ -49,20 +49,21 @@ async function bootRuntime() {
   status.textContent = 'Booting pinned Vivari runtime…';
   teardownButton.disabled = true;
   rebootButton.disabled = true;
-  const unsupportedOptionsRuntime = createVivariRuntime({
+  const credentiallessRuntime = createVivariRuntime({
     id: crypto.randomUUID(),
-    loadSdk: async () => { throw new Error('Unsupported boot options must reject before loading Vivari'); },
+    loadSdk: loadPinnedVivariSdk,
   });
-  try {
-    await unsupportedOptionsRuntime.boot({ coep: 'credentialless' });
-    throw new Error('Vivari adapter accepted an unsupported host boot option');
-  } catch (error) {
-    if (!(error instanceof Error) || (error as { code?: unknown }).code !== 'UNSUPPORTED_CAPABILITY'
-      || unsupportedOptionsRuntime.state !== 'created') {
-      throw error;
-    }
+  await credentiallessRuntime.boot({ coep: 'credentialless' });
+  if (credentiallessRuntime.state !== 'ready') {
+    throw new Error('Vivari adapter did not boot after accepting credentialless COEP');
   }
-  status.dataset.unsupportedBootOptionProof = 'coep-rejected-before-sdk-load';
+  await credentiallessRuntime.teardown();
+  // Widen the narrowed 'ready' type: teardown() mutates the live state value.
+  const credentiallessPostTeardownState: string = credentiallessRuntime.state;
+  if (credentiallessPostTeardownState !== 'terminated') {
+    throw new Error('Vivari adapter teardown did not terminate after accepting credentialless COEP');
+  }
+  status.dataset.credentiallessCoepProof = 'accepted-and-torn-down';
   const bootAbortController = new AbortController();
   const abortedBootRuntime = createVivariRuntime({ id: crypto.randomUUID(), loadSdk: loadPinnedVivariSdk });
   const abortedBoot = abortedBootRuntime.boot({ signal: bootAbortController.signal });

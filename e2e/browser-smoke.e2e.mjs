@@ -81,9 +81,9 @@ try {
     'the browser lab must pass its controlled self-hosted origin through the adapter to the owned Vivari boot seam',
   );
   assert.equal(
-    await evaluate(`document.querySelector('#status')?.dataset.unsupportedBootOptionProof`),
-    'coep-rejected-before-sdk-load',
-    'an unsupported host boot option must reject in the browser before the Vivari SDK can load a guest',
+    await evaluate(`document.querySelector('#status')?.dataset.credentiallessCoepProof`),
+    'accepted-and-torn-down',
+    'credentialless COEP must boot and tear down through the actual isolated browser adapter before the primary runtime starts',
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.abortedBootProof`),

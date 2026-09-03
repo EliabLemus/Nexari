@@ -43,9 +43,27 @@ test('rejects without isolation before booting the fork', async () => {
   assert.equal(fake.calls.boot, 0);
 });
 
+test('accepts credentialless COEP without forwarding it to the owned Vivari boot seam', async () => {
+  const fake = fakeSdk();
+  let receivedOptions;
+  const runtime = createVivariRuntime({
+    id: 'credentialless-coep',
+    isIsolated: () => true,
+    loadSdk: async () => ({ boot: async (options) => {
+      receivedOptions = options;
+      return fake.instance;
+    } }),
+  });
+  await runtime.boot({ coep: 'credentialless' });
+  assert.equal(fake.calls.boot, 0, 'the adapter test seam owns boot accounting');
+  assert.equal(receivedOptions.coep, undefined);
+  assert.equal(receivedOptions.signal instanceof AbortSignal, true);
+  await runtime.teardown();
+});
+
 test('rejects unsupported host boot options before loading the Vivari SDK and remains retryable', async () => {
   for (const [option, value] of [
-    ['coep', 'credentialless'],
+    ['coep', 'require-corp'],
     ['workdirName', 'project'],
     ['forwardPreviewErrors', true],
   ]) {

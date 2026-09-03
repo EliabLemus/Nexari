@@ -556,7 +556,11 @@ function isVivariCommandNotFound(cause: unknown): cause is Error & { code: 'ERR_
 
 function unsupportedBootOption(options?: RuntimeBootOptions): 'coep' | 'workdirName' | 'forwardPreviewErrors' | undefined {
   if (!options) return undefined;
-  for (const option of ['coep', 'workdirName', 'forwardPreviewErrors'] as const) {
+  // The host's `credentialless` request is satisfied by the outer document's
+  // isolation headers; Vivari must not receive a WebContainer-specific option.
+  // Keep every other value fail-closed for untyped JavaScript callers.
+  if (options.coep !== undefined && options.coep !== 'credentialless') return 'coep';
+  for (const option of ['workdirName', 'forwardPreviewErrors'] as const) {
     if (Object.hasOwn(options, option)) return option;
   }
   return undefined;
