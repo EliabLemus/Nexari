@@ -572,7 +572,7 @@ function isVivariCommandNotFound(cause: unknown): cause is Error & { code: 'ERR_
 function isStackBlitzPreviewOrigin(previewOrigin: string | undefined): boolean {
   if (!previewOrigin) return false;
   try {
-    const hostname = new URL(previewOrigin).hostname.toLowerCase();
+    const hostname = new URL(previewOrigin).hostname.toLowerCase().replace(/\.+$/, '');
     return hostname === 'stackblitz.io' || hostname.endsWith('.stackblitz.io');
   } catch {
     return false;

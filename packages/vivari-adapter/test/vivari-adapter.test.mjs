@@ -154,6 +154,31 @@ test('rejects a StackBlitz preview origin before loading the owned Vivari SDK', 
   assert.equal(runtime.state, 'created');
 });
 
+test('rejects a trailing-dot StackBlitz preview origin before loading the owned Vivari SDK', async () => {
+  for (const previewOrigin of [
+    'https://nexari-preview.stackblitz.io.',
+    'https://nexari-preview.stackblitz.io%2E',
+  ]) {
+    let sdkLoads = 0;
+    const runtime = createVivariRuntime({
+      id: `trailing-dot-stackblitz-preview-origin-${sdkLoads}`,
+      isIsolated: () => true,
+      loadSdk: async () => {
+        sdkLoads++;
+        throw new Error('SDK must not load');
+      },
+    });
+    await assert.rejects(
+      runtime.boot({ previewOrigin }),
+      (error) => error instanceof RuntimeError
+        && error.code === 'UNSUPPORTED_CAPABILITY'
+        && error.message === 'StackBlitz preview origins are intentionally unavailable in Nexari.',
+    );
+    assert.equal(sdkLoads, 0);
+    assert.equal(runtime.state, 'created');
+  }
+});
+
 test('rejects an invalid preview origin before loading the owned Vivari SDK', async () => {
   let sdkLoads = 0;
   const runtime = createVivariRuntime({
