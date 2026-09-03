@@ -73,6 +73,23 @@ test('rejects unsupported host boot options before loading the Vivari SDK and re
   }
 });
 
+test('forwards an explicit self-hosted preview origin to the owned Vivari boot seam', async () => {
+  const fake = fakeSdk();
+  let receivedOptions;
+  const runtime = createVivariRuntime({
+    id: 'self-hosted-preview-origin',
+    isIsolated: () => true,
+    loadSdk: async () => ({ boot: async (options) => {
+      receivedOptions = options;
+      return fake.instance;
+    } }),
+  });
+  await runtime.boot({ previewOrigin: 'https://nexari.example.test' });
+  assert.equal(receivedOptions.previewOrigin, 'https://nexari.example.test');
+  assert.equal(receivedOptions.signal instanceof AbortSignal, true);
+  await runtime.teardown();
+});
+
 test('boot after teardown rejects as torn down before evaluating isolation', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'terminated-before-boot', isIsolated: () => false, loadSdk: fake.loader });

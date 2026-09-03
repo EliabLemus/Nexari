@@ -49,6 +49,8 @@ export type RuntimeEventMap = {
  */
 export interface RuntimeBootOptions {
   signal?: AbortSignal;
+  /** Optional self-hosted origin that serves the runtime's preview routes. */
+  previewOrigin?: string;
   coep?: 'credentialless';
   workdirName?: string;
   forwardPreviewErrors?: boolean;

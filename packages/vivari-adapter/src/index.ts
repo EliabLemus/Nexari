@@ -34,7 +34,7 @@ export interface VivariLike {
 }
 
 export interface VivariSdk {
-  boot(options?: { signal?: AbortSignal }): Promise<VivariLike>;
+  boot(options?: { signal?: AbortSignal; previewOrigin?: string }): Promise<VivariLike>;
 }
 
 export interface VivariAdapterOptions {
@@ -211,11 +211,12 @@ class NexariVivariRuntime implements BrowserRuntime {
       return Promise.reject(new RuntimeError('UNSUPPORTED_CAPABILITY', `Unsupported boot option: ${unsupportedOption}`));
     }
     const { signal } = options ?? {};
-    if (!this.#bootPromise) this.#bootPromise = this.#boot(signal);
+    if (!this.#bootPromise) this.#bootPromise = this.#boot(options);
     return this.#bootPromise;
   }
 
-  async #boot(signal?: AbortSignal): Promise<void> {
+  async #boot(options?: RuntimeBootOptions): Promise<void> {
+    const { signal, previewOrigin } = options ?? {};
     if (this.#isTornDown()) {
       throw new RuntimeError('TORN_DOWN', 'Runtime has been torn down');
     }
@@ -240,7 +241,7 @@ class NexariVivariRuntime implements BrowserRuntime {
         this.#lifecycle.markTerminated();
         throw new RuntimeError('BOOT_ABORTED', 'Runtime boot was cancelled while the Vivari SDK was loading');
       }
-      this.#guestBootPromise = sdk.boot({ signal: abortController.signal });
+      this.#guestBootPromise = sdk.boot({ signal: abortController.signal, ...(previewOrigin === undefined ? {} : { previewOrigin }) });
       this.#guestBootInFlight = true;
       let instance: VivariLike;
       try {
