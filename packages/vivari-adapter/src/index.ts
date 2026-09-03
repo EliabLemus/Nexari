@@ -206,6 +206,9 @@ class NexariVivariRuntime implements BrowserRuntime {
 
   boot(options?: RuntimeBootOptions): Promise<void> {
     if (this.#isTornDown()) return Promise.reject(new RuntimeError('TORN_DOWN', 'Runtime has been torn down'));
+    if (isStackBlitzPreviewOrigin(options?.previewOrigin)) {
+      return Promise.reject(new RuntimeError('UNSUPPORTED_CAPABILITY', 'StackBlitz preview origins are intentionally unavailable in Nexari.'));
+    }
     const unsupportedOption = unsupportedBootOption(options);
     if (unsupportedOption) {
       return Promise.reject(new RuntimeError('UNSUPPORTED_CAPABILITY', `Unsupported boot option: ${unsupportedOption}`));
@@ -552,6 +555,16 @@ function defaultIsolation(): boolean {
 
 function isVivariCommandNotFound(cause: unknown): cause is Error & { code: 'ERR_COMMAND_NOT_FOUND' } {
   return cause instanceof Error && (cause as { code?: unknown }).code === 'ERR_COMMAND_NOT_FOUND';
+}
+
+function isStackBlitzPreviewOrigin(previewOrigin: string | undefined): boolean {
+  if (!previewOrigin) return false;
+  try {
+    const hostname = new URL(previewOrigin).hostname.toLowerCase();
+    return hostname === 'stackblitz.io' || hostname.endsWith('.stackblitz.io');
+  } catch {
+    return false;
+  }
 }
 
 function unsupportedBootOption(options?: RuntimeBootOptions): 'coep' | 'workdirName' | 'forwardPreviewErrors' | undefined {
