@@ -4,6 +4,15 @@ import test from 'node:test';
 
 const matrixUrl = new URL('../compatibility/bolt-compatibility-matrix.md', import.meta.url);
 
+test('BOLT-WC-003 is only marked proven with the browser-lab filesystem CRUD proof', async () => {
+  const matrix = await readFile(matrixUrl, 'utf8');
+  assert.match(
+    matrix,
+    /^\| BOLT-WC-003 \| must-have \| filesystem: Filesystem supports readFile, writeFile, mkdir, readdir and rm with text and binary payloads\. \| app\/lib\/stores\/files\.ts:554-888; app\/lib\/hooks\/useGit\.ts:191-311 \| e2e\/browser-smoke\.e2e\.mjs \(text CRUD, byte-exact binary read\/write and nested recursive directory lifecycle\) \| proven \|$/m,
+    'BOLT-WC-003 needs the real browser-lab filesystem proof before it can leave the compatibility gate as unknown',
+  );
+});
+
 test('BOLT-WC-017 is only marked proven with the isolated and non-isolated browser-lab proof', async () => {
   const matrix = await readFile(matrixUrl, 'utf8');
   assert.match(
