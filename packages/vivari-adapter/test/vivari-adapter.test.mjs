@@ -168,6 +168,36 @@ test('rejects a non-HTTP preview origin before loading the Vivari SDK', async ()
   assert.equal(runtime.state, 'created');
 });
 
+test('rejects every credential-bearing preview origin before loading the Vivari SDK and remains retryable', async () => {
+  for (const previewOrigin of [
+    'https://preview-user:preview-password@nexari.example.test',
+    'https://:preview-password@nexari.example.test',
+    'https://preview-user@nexari.example.test',
+  ]) {
+    const fake = fakeSdk();
+    let sdkLoads = 0;
+    const runtime = createVivariRuntime({
+      id: `credential-bearing-preview-origin-${sdkLoads}`,
+      isIsolated: () => true,
+      loadSdk: async () => {
+        sdkLoads++;
+        return { boot: async () => fake.instance };
+      },
+    });
+    await assert.rejects(
+      runtime.boot({ previewOrigin }),
+      (error) => error instanceof RuntimeError
+        && error.code === 'UNSUPPORTED_CAPABILITY'
+        && error.message === 'Preview origin must not contain credentials.',
+    );
+    assert.equal(sdkLoads, 0);
+    assert.equal(runtime.state, 'created');
+    await runtime.boot({ previewOrigin: 'https://nexari.example.test' });
+    assert.equal(sdkLoads, 1);
+    await runtime.teardown();
+  }
+});
+
 test('boot after teardown rejects as torn down before evaluating isolation', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'terminated-before-boot', isIsolated: () => false, loadSdk: fake.loader });

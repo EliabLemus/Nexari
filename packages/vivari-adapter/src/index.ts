@@ -212,6 +212,9 @@ class NexariVivariRuntime implements BrowserRuntime {
     if (isNonHttpPreviewOrigin(options?.previewOrigin)) {
       return Promise.reject(new RuntimeError('UNSUPPORTED_CAPABILITY', 'Preview origin must be an absolute HTTP(S) URL.'));
     }
+    if (hasPreviewOriginCredentials(options?.previewOrigin)) {
+      return Promise.reject(new RuntimeError('UNSUPPORTED_CAPABILITY', 'Preview origin must not contain credentials.'));
+    }
     if (isStackBlitzPreviewOrigin(options?.previewOrigin)) {
       return Promise.reject(new RuntimeError('UNSUPPORTED_CAPABILITY', 'StackBlitz preview origins are intentionally unavailable in Nexari.'));
     }
@@ -587,6 +590,12 @@ function isNonHttpPreviewOrigin(previewOrigin: string | undefined): boolean {
   if (!previewOrigin) return false;
   const { protocol } = new URL(previewOrigin);
   return protocol !== 'http:' && protocol !== 'https:';
+}
+
+function hasPreviewOriginCredentials(previewOrigin: string | undefined): boolean {
+  if (!previewOrigin) return false;
+  const { username, password } = new URL(previewOrigin);
+  return username.length > 0 || password.length > 0;
 }
 
 function unsupportedBootOption(options?: RuntimeBootOptions): 'coep' | 'workdirName' | 'forwardPreviewErrors' | undefined {
