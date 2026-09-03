@@ -85,7 +85,9 @@ async function bootRuntime() {
   let initialServerReady = true;
   const runtime = createVivariRuntime({ id: runtimeId, loadSdk: loadPinnedVivariSdk });
   activeRuntime = runtime;
-  await runtime.boot();
+  const previewOrigin = window.location.origin;
+  await runtime.boot({ previewOrigin });
+  status.dataset.selfHostedPreviewOriginProof = previewOrigin;
   const capabilities = runtime.getCapabilities();
   const unsupportedCapabilityNames = ['native_addons', 'docker', 'tcp_remote', 'udp', 'ssh', 'linux_binary', 'permission_changes', 'symlinks', 'interactive_terminal', 'text_search'] as const;
   if (unsupportedCapabilityNames.some((name) => capabilities[name] !== 'unsupported')) {
