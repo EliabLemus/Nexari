@@ -108,6 +108,36 @@ test('forwards an explicit self-hosted preview origin to the owned Vivari boot s
   await runtime.teardown();
 });
 
+test('rejects a conflicting preview origin while the first boot is in progress', async () => {
+  const fake = fakeSdk();
+  let receivedOptions;
+  let resolveSdk;
+  const sdkLoaded = new Promise((resolve) => { resolveSdk = resolve; });
+  const runtime = createVivariRuntime({
+    id: 'conflicting-preview-origin',
+    isIsolated: () => true,
+    loadSdk: async () => {
+      await sdkLoaded;
+      return { boot: async (options) => {
+        receivedOptions = options;
+        return fake.instance;
+      } };
+    },
+  });
+  const firstBoot = runtime.boot({ previewOrigin: 'https://first.nexari.example.test' });
+  const conflictingBoot = runtime.boot({ previewOrigin: 'https://second.nexari.example.test' });
+  resolveSdk();
+  await assert.rejects(
+    conflictingBoot,
+    (error) => error instanceof RuntimeError
+      && error.code === 'BOOT_FAILED'
+      && error.message === 'Runtime boot options cannot change while boot is in progress.',
+  );
+  await firstBoot;
+  assert.equal(receivedOptions.previewOrigin, 'https://first.nexari.example.test');
+  await runtime.teardown();
+});
+
 test('rejects a preview URL with a path, query, or fragment before loading the Vivari SDK', async () => {
   for (const previewOrigin of [
     'https://nexari.example.test/preview',

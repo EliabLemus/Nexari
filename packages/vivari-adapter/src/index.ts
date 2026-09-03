@@ -89,6 +89,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   #watchers = new Set<RuntimeFsWatcher>();
   #exportPromises = new Set<Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>>();
   #bootPromise: Promise<void> | undefined;
+  #bootPreviewOrigin: string | undefined;
   #guestBootPromise: Promise<VivariLike> | undefined;
   #guestBootInFlight = false;
   #bootAbortController: AbortController | undefined;
@@ -226,7 +227,14 @@ class NexariVivariRuntime implements BrowserRuntime {
       return Promise.reject(new RuntimeError('UNSUPPORTED_CAPABILITY', `Unsupported boot option: ${unsupportedOption}`));
     }
     const { signal } = options ?? {};
-    if (!this.#bootPromise) this.#bootPromise = this.#boot(options);
+    if (this.#bootPromise) {
+      if (options?.previewOrigin !== this.#bootPreviewOrigin) {
+        return Promise.reject(new RuntimeError('BOOT_FAILED', 'Runtime boot options cannot change while boot is in progress.'));
+      }
+      return this.#bootPromise;
+    }
+    this.#bootPreviewOrigin = options?.previewOrigin;
+    this.#bootPromise = this.#boot(options);
     return this.#bootPromise;
   }
 
