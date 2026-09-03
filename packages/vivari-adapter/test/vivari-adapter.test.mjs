@@ -108,6 +108,32 @@ test('forwards an explicit self-hosted preview origin to the owned Vivari boot s
   await runtime.teardown();
 });
 
+test('rejects a preview URL with a path, query, or fragment before loading the Vivari SDK', async () => {
+  for (const previewOrigin of [
+    'https://nexari.example.test/preview',
+    'https://nexari.example.test/?tenant=nexari',
+    'https://nexari.example.test/#preview',
+  ]) {
+    let sdkLoads = 0;
+    const runtime = createVivariRuntime({
+      id: `non-origin-preview-url-${sdkLoads}`,
+      isIsolated: () => true,
+      loadSdk: async () => {
+        sdkLoads++;
+        throw new Error('SDK must not load');
+      },
+    });
+    await assert.rejects(
+      runtime.boot({ previewOrigin }),
+      (error) => error instanceof RuntimeError
+        && error.code === 'UNSUPPORTED_CAPABILITY'
+        && error.message === 'Preview origin must not include a path, query, or fragment.',
+    );
+    assert.equal(sdkLoads, 0);
+    assert.equal(runtime.state, 'created');
+  }
+});
+
 test('rejects a StackBlitz preview origin before loading the owned Vivari SDK', async () => {
   let sdkLoads = 0;
   const runtime = createVivariRuntime({
