@@ -13,6 +13,15 @@ test('BOLT-WC-003 is only marked proven with the browser-lab filesystem CRUD pro
   );
 });
 
+test('BOLT-WC-004 is only marked proven with the browser-lab stable workdir proof', async () => {
+  const matrix = await readFile(matrixUrl, 'utf8');
+  assert.match(
+    matrix,
+    /^\| BOLT-WC-004 \| must-have \| workdir: Runtime exposes a stable workdir used for path translation by actions, persistence and git\. \| app\/lib\/runtime\/action-runner\.ts:317-466; app\/lib\/hooks\/useGit\.ts:87-138 \| e2e\/browser-smoke\.e2e\.mjs \(real guest process observes the adapter's stable root workdir\) \| proven \|$/m,
+    'BOLT-WC-004 needs the real browser-lab workdir observation before it can leave the compatibility gate as unknown',
+  );
+});
+
 test('BOLT-WC-017 is only marked proven with the isolated and non-isolated browser-lab proof', async () => {
   const matrix = await readFile(matrixUrl, 'utf8');
   assert.match(
