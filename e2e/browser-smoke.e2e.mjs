@@ -144,8 +144,13 @@ try {
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.capabilitiesProof`),
-    'native_addons-docker-tcp_remote-udp-ssh-linux_binary-permission_changes-symlinks-text_search-unsupported-filesystem_watch-experimental',
-    'the browser lab must explicitly disclose unsupported native, permission-change and symlink capabilities while filesystem watching remains experimental',
+    'native_addons-docker-tcp_remote-udp-ssh-linux_binary-permission_changes-symlinks-interactive_terminal-text_search-unsupported-filesystem_watch-experimental',
+    'the browser lab must explicitly disclose unsupported native, permission-change, symlink and interactive-terminal capabilities while filesystem watching remains experimental',
+  );
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.interactiveTerminalCapabilityProof`),
+    'unsupported',
+    'the browser lab must explicitly disclose that an interactive terminal is unavailable until browser support is proven',
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.stdinProof`),

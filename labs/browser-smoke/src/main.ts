@@ -87,7 +87,7 @@ async function bootRuntime() {
   activeRuntime = runtime;
   await runtime.boot();
   const capabilities = runtime.getCapabilities();
-  const unsupportedCapabilityNames = ['native_addons', 'docker', 'tcp_remote', 'udp', 'ssh', 'linux_binary', 'permission_changes', 'symlinks', 'text_search'] as const;
+  const unsupportedCapabilityNames = ['native_addons', 'docker', 'tcp_remote', 'udp', 'ssh', 'linux_binary', 'permission_changes', 'symlinks', 'interactive_terminal', 'text_search'] as const;
   if (unsupportedCapabilityNames.some((name) => capabilities[name] !== 'unsupported')) {
     throw new Error('Vivari browser-runtime limitations must be explicitly unsupported');
   }
@@ -230,6 +230,10 @@ async function bootRuntime() {
     throw new Error('Vivari shell compatibility changed; add a positive shell browser proof before exposing it');
   }
   status.dataset.shellCommandUnavailableProof = 'exit-127-diagnostic';
+  if (capabilities.interactive_terminal !== 'unsupported') {
+    throw new Error('Vivari interactive terminal support must remain explicitly unavailable until a browser proof exists');
+  }
+  status.dataset.interactiveTerminalCapabilityProof = 'unsupported';
   if (runtime.workdir !== '/' || observedProcessOptions.cwd !== runtime.workdir) {
     throw new Error('Vivari stable workdir proof failed');
   }

@@ -8,6 +8,7 @@ export type CapabilityName =
   | 'permission_changes'
   | 'symlinks'
   | 'filesystem_watch'
+  | 'interactive_terminal'
   | 'text_search';
 
 export type CapabilityState = 'supported' | 'experimental' | 'unsupported';
@@ -24,6 +25,7 @@ export function unsupportedCapabilities(): RuntimeCapabilities {
     permission_changes: 'unsupported',
     symlinks: 'unsupported',
     filesystem_watch: 'experimental',
+    interactive_terminal: 'unsupported',
     text_search: 'unsupported',
   };
 }
