@@ -212,6 +212,15 @@ async function bootRuntime() {
     throw new Error('Vivari process cwd, environment or argument proof failed');
   }
   status.dataset.processOptionsProof = 'cwd-env-args-exit';
+  try {
+    await runtime.spawn('npm', ['run', 'nexari-spawn-proof']);
+    throw new Error('Vivari unexpectedly exposed npm without browser compatibility evidence');
+  } catch (error) {
+    if (!(error instanceof Error) || (error as { code?: unknown }).code !== 'COMMAND_NOT_FOUND') {
+      throw error;
+    }
+  }
+  status.dataset.npmCommandUnavailableProof = 'command-not-found';
   if (runtime.workdir !== '/' || observedProcessOptions.cwd !== runtime.workdir) {
     throw new Error('Vivari stable workdir proof failed');
   }
