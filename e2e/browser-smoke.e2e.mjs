@@ -167,6 +167,11 @@ try {
     'command-not-found',
     'the owned Vivari process bridge must surface unavailable npm as an explicit typed error rather than silently degrading',
   );
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.shellCommandUnavailableProof`),
+    'exit-127-diagnostic',
+    'the owned Vivari process bridge must expose the pinned shell limitation rather than silently claiming shell compatibility',
+  );
   assert.match(
     await evaluate(`document.querySelector('#status')?.dataset.portOpen`),
     /^3111:\/preview\/3111\/$/,

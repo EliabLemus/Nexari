@@ -221,6 +221,15 @@ async function bootRuntime() {
     }
   }
   status.dataset.npmCommandUnavailableProof = 'command-not-found';
+  const shellToken = 'nexari-shell-process';
+  const shellProcess = await runtime.spawn('sh', ['-c', `printf ${shellToken}`]);
+  let shellOutput = '';
+  for await (const chunk of shellProcess.output) shellOutput += chunk;
+  const shellExitCode = await shellProcess.exit;
+  if (shellExitCode !== 127 || !shellOutput.includes('not found')) {
+    throw new Error('Vivari shell compatibility changed; add a positive shell browser proof before exposing it');
+  }
+  status.dataset.shellCommandUnavailableProof = 'exit-127-diagnostic';
   if (runtime.workdir !== '/' || observedProcessOptions.cwd !== runtime.workdir) {
     throw new Error('Vivari stable workdir proof failed');
   }
