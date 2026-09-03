@@ -81,6 +81,11 @@ try {
     'an unsupported host boot option must reject in the browser before the Vivari SDK can load a guest',
   );
   assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.abortedBootProof`),
+    'boot-aborted-terminated-before-fresh-runtime',
+    'a caller-aborted boot of the pinned Vivari adapter must terminate cleanly before the next fresh browser runtime boots',
+  );
+  assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.fsInstanceIsolation`),
     'fresh-before-write',
     'a newly booted Vivari runtime must not inherit a filesystem marker from a prior runtime instance',

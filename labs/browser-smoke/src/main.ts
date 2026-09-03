@@ -63,6 +63,20 @@ async function bootRuntime() {
     }
   }
   status.dataset.unsupportedBootOptionProof = 'coep-rejected-before-sdk-load';
+  const bootAbortController = new AbortController();
+  const abortedBootRuntime = createVivariRuntime({ id: crypto.randomUUID(), loadSdk: loadPinnedVivariSdk });
+  const abortedBoot = abortedBootRuntime.boot({ signal: bootAbortController.signal });
+  bootAbortController.abort(new Error('Browser lab cancelled the pinned Vivari boot'));
+  try {
+    await abortedBoot;
+    throw new Error('Vivari adapter completed a browser boot after caller cancellation');
+  } catch (error) {
+    if (!(error instanceof Error) || (error as { code?: unknown }).code !== 'BOOT_ABORTED'
+      || abortedBootRuntime.state !== 'terminated') {
+      throw error;
+    }
+  }
+  status.dataset.abortedBootProof = 'boot-aborted-terminated-before-fresh-runtime';
   // This lab proves independent, short-lived runtime instances. Vivari's default
   // OPFS mirror is intentionally durable, so clear only this controlled lab's
   // origin-scoped state before constructing each fresh instance.
