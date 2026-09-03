@@ -471,6 +471,15 @@ test('maps the owned fork and detaches previews on idempotent teardown', async (
   await assert.rejects(runtime.spawn('node'), (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
 });
 
+test('rejects a relative mountPoint before it reaches the owned Vivari mount seam', async () => {
+  const fake = fakeSdk();
+  const runtime = createVivariRuntime({ id: 'relative-mount-point', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  await assert.rejects(runtime.mount({}, { mountPoint: 'project' }), /mountPoint must be an absolute path/);
+  assert.equal(fake.calls.mount, 0);
+  await runtime.teardown();
+});
+
 test('teardown clears an attached preview source so a stale document cannot outlive the runtime', async () => {
   const fake = fakeSdk();
   const preview = {

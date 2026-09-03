@@ -329,6 +329,9 @@ class NexariVivariRuntime implements BrowserRuntime {
 
   async mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void> {
     const instance = this.#ready();
+    if (options?.mountPoint !== undefined && !options.mountPoint.startsWith('/')) {
+      throw new TypeError('mountPoint must be an absolute path');
+    }
     if (options?.signal?.aborted) throw options.signal.reason;
     const controller = new AbortController();
     const abortForCaller = () => controller.abort(options?.signal?.reason);
