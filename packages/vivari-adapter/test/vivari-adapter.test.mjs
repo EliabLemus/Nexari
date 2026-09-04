@@ -44,6 +44,19 @@ test('rejects without isolation before booting the fork', async () => {
   assert.equal(fake.calls.boot, 0);
 });
 
+test('an isolation failure before the SDK loads remains retryable once isolation is available', async () => {
+  let isolated = false;
+  const fake = fakeSdk();
+  const runtime = createVivariRuntime({ id: 'isolation-retry', isIsolated: () => isolated, loadSdk: fake.loader });
+  await assert.rejects(runtime.boot(), (error) => error instanceof RuntimeError && error.code === 'ISOLATION_REQUIRED');
+  assert.equal(runtime.state, 'created');
+  isolated = true;
+  await runtime.boot();
+  assert.equal(runtime.state, 'ready');
+  await runtime.teardown();
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('accepts credentialless COEP without forwarding it to the owned Vivari boot seam', async () => {
   const fake = fakeSdk();
   let receivedOptions;

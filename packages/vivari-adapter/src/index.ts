@@ -235,8 +235,18 @@ class NexariVivariRuntime implements BrowserRuntime {
       return this.#bootPromise;
     }
     this.#bootPreviewOrigin = previewOrigin;
-    this.#bootPromise = this.#boot({ ...options, ...(previewOrigin === undefined ? {} : { previewOrigin }) });
-    return this.#bootPromise;
+    const bootPromise = this.#boot({ ...options, ...(previewOrigin === undefined ? {} : { previewOrigin }) });
+    this.#bootPromise = bootPromise;
+    // #boot starts synchronously until its first await. Clear this cache only
+    // after assignment, otherwise an early isolation rejection can be assigned
+    // back into #bootPromise after its internal cleanup runs.
+    void bootPromise.catch(() => {
+      if (this.state === 'created' && this.#bootPromise === bootPromise) {
+        this.#bootPromise = undefined;
+        this.#bootPreviewOrigin = undefined;
+      }
+    });
+    return bootPromise;
   }
 
   async #boot(options?: RuntimeBootOptions): Promise<void> {
