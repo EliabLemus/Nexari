@@ -26,10 +26,10 @@ export interface VivariLike {
   mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void>;
   spawn(command: string, args?: string[], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess>;
   attachPreview(iframe: HTMLIFrameElement): () => void | PromiseLike<void>;
-  on(event: 'server-ready', listener: (port: number, url: string) => void): () => void;
-  on(event: 'port', listener: (port: number, kind: 'open' | 'close', url: string) => void): () => void;
-  on(event: 'fs-change', listener: (event: RuntimeFsChangeEvent) => void): () => void;
-  on(event: 'error', listener: (error: Error) => void): () => void;
+  on(event: 'server-ready', listener: (port: number, url: string) => void): () => void | PromiseLike<void>;
+  on(event: 'port', listener: (port: number, kind: 'open' | 'close', url: string) => void): () => void | PromiseLike<void>;
+  on(event: 'fs-change', listener: (event: RuntimeFsChangeEvent) => void): () => void | PromiseLike<void>;
+  on(event: 'error', listener: (error: Error) => void): () => void | PromiseLike<void>;
   export(path?: string): Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>;
   teardown(): void | Promise<void>;
 }
@@ -77,7 +77,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   #instance: VivariLike | undefined;
   #processes = new Set<RuntimeProcess>();
   #detachPreview = new Set<() => void | PromiseLike<void>>();
-  #detachEvents = new Set<() => void>();
+  #detachEvents = new Set<() => void | PromiseLike<void>>();
   #mountAbortControllers = new Set<AbortController>();
   #spawnAbortControllers = new Set<AbortController>();
   #mountPromises = new Set<Promise<void>>();
@@ -471,7 +471,7 @@ class NexariVivariRuntime implements BrowserRuntime {
   on<E extends keyof RuntimeEventMap>(event: E, listener: (...args: RuntimeEventMap[E]) => void): () => void {
     const instance = this.#ready();
     let active = true;
-    let detach: () => void;
+    let detach: () => void | PromiseLike<void>;
     if (event === 'server-ready') {
       const forwardIfReady = (port: number, url: string) => {
         if (active && this.state === 'ready') (listener as (port: number, url: string) => void)(port, url);
@@ -497,13 +497,22 @@ class NexariVivariRuntime implements BrowserRuntime {
     } else {
       throw new RuntimeError('UNSUPPORTED_CAPABILITY', `Unsupported event ${String(event)}`);
     }
-    const ownedDetach = () => {
+    const ownedDetach = (): void | PromiseLike<void> => {
       if (!active) return;
       active = false;
       try {
         // A guest unsubscription may synchronously emit. Gate first so it
         // cannot deliver an event after the host has detached its listener.
-        detach();
+        const result = detach();
+        if (result && typeof (result as PromiseLike<void>).then === 'function') {
+          return Promise.resolve(result).then(
+            () => { this.#detachEvents.delete(ownedDetach); },
+            (error) => {
+              active = true;
+              throw error;
+            },
+          );
+        }
         this.#detachEvents.delete(ownedDetach);
       } catch (error) {
         // Keep failed cleanup retryable, but do not expose an event emitted
@@ -562,7 +571,9 @@ class NexariVivariRuntime implements BrowserRuntime {
     const cleanUp = (operation: () => void | PromiseLike<void>) => {
       try {
         const result = operation();
-        if (result instanceof Promise) return result.catch((error) => { failure ??= error; });
+        if (result && typeof (result as PromiseLike<void>).then === 'function') {
+          return Promise.resolve(result).catch((error) => { failure ??= error; });
+        }
       } catch (error) {
         failure ??= error;
       }

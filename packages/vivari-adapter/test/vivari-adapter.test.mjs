@@ -1518,6 +1518,26 @@ test('teardown retries a failed runtime event unsubscribe', async () => {
   assert.equal(runtime.state, 'terminated');
 });
 
+test('teardown waits for a thenable event unsubscribe before terminating the runtime', async () => {
+  const fake = fakeSdk();
+  let releaseUnsubscribe;
+  fake.instance.on = () => () => ({
+    then(resolve, reject) {
+      return new Promise((innerResolve) => { releaseUnsubscribe = innerResolve; }).then(resolve, reject);
+    },
+  });
+  const runtime = createVivariRuntime({ id: 'thenable-event-unsubscribe', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  runtime.on('server-ready', () => {});
+  const teardown = runtime.teardown();
+  await new Promise(setImmediate);
+  assert.equal(fake.calls.teardown, 1, 'guest teardown may begin before event cleanup');
+  assert.equal(runtime.state, 'tearing_down');
+  releaseUnsubscribe();
+  await teardown;
+  assert.equal(runtime.state, 'terminated');
+});
+
 test('teardown waits for asynchronous preview detachment before terminating the guest', async () => {
   const fake = fakeSdk();
   let releasePreviewDetach;
