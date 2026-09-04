@@ -1123,6 +1123,26 @@ test('forwards an owned Vivari runtime failure as a typed host error event', asy
   assert.equal(received.length, 1);
 });
 
+test('an error subscription cannot synchronously deliver a stale guest error while being detached', async () => {
+  const fake = fakeSdk();
+  const originalOn = fake.instance.on;
+  fake.instance.on = (event, listener) => {
+    const detach = originalOn(event, listener);
+    if (event !== 'error') return detach;
+    return () => {
+      fake.instance.emitError(new Error('must not reach a host that unsubscribed'));
+      detach();
+    };
+  };
+  const runtime = createVivariRuntime({ id: 'error-unsubscribe-race', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const received = [];
+  const detach = runtime.on('error', (error) => { received.push(error); });
+  detach();
+  assert.deepEqual(received, []);
+  await runtime.teardown();
+});
+
 test('forwards raw port state as a typed runtime event', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'port-events', isIsolated: () => true, loadSdk: fake.loader });

@@ -451,38 +451,47 @@ class NexariVivariRuntime implements BrowserRuntime {
 
   on<E extends keyof RuntimeEventMap>(event: E, listener: (...args: RuntimeEventMap[E]) => void): () => void {
     const instance = this.#ready();
+    let active = true;
     let detach: () => void;
     if (event === 'server-ready') {
       const forwardIfReady = (port: number, url: string) => {
-        if (this.state === 'ready') (listener as (port: number, url: string) => void)(port, url);
+        if (active && this.state === 'ready') (listener as (port: number, url: string) => void)(port, url);
       };
       detach = instance.on('server-ready', forwardIfReady);
     } else if (event === 'port') {
       const forwardIfReady = (port: number, kind: 'open' | 'close', url: string) => {
-        if (this.state === 'ready' || (this.state === 'tearing_down' && kind === 'close')) {
+        if (active && (this.state === 'ready' || (this.state === 'tearing_down' && kind === 'close'))) {
           (listener as unknown as (port: number, kind: 'open' | 'close', url: string) => void)(port, kind, url);
         }
       };
       detach = instance.on('port', forwardIfReady);
     } else if (event === 'fs-change') {
       const forwardIfReady = (change: RuntimeFsChangeEvent) => {
-        if (this.state === 'ready') (listener as (event: RuntimeFsChangeEvent) => void)(change);
+        if (active && this.state === 'ready') (listener as (event: RuntimeFsChangeEvent) => void)(change);
       };
       detach = instance.on('fs-change', forwardIfReady);
     } else if (event === 'error') {
       const forwardIfReady = (error: Error) => {
-        if (this.state === 'ready') (listener as (error: Error) => void)(error);
+        if (active && this.state === 'ready') (listener as (error: Error) => void)(error);
       };
       detach = instance.on('error', forwardIfReady);
     } else {
       throw new RuntimeError('UNSUPPORTED_CAPABILITY', `Unsupported event ${String(event)}`);
     }
-    let active = true;
     const ownedDetach = () => {
       if (!active) return;
-      detach();
       active = false;
-      this.#detachEvents.delete(ownedDetach);
+      try {
+        // A guest unsubscription may synchronously emit. Gate first so it
+        // cannot deliver an event after the host has detached its listener.
+        detach();
+        this.#detachEvents.delete(ownedDetach);
+      } catch (error) {
+        // Keep failed cleanup retryable, but do not expose an event emitted
+        // synchronously by the failing guest detach.
+        active = true;
+        throw error;
+      }
     };
     this.#detachEvents.add(ownedDetach);
     return ownedDetach;
