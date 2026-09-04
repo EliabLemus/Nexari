@@ -226,15 +226,15 @@ class NexariVivariRuntime implements BrowserRuntime {
     if (unsupportedOption) {
       return Promise.reject(new RuntimeError('UNSUPPORTED_CAPABILITY', `Unsupported boot option: ${unsupportedOption}`));
     }
-    const { signal } = options ?? {};
+    const previewOrigin = normalizePreviewOrigin(options?.previewOrigin);
     if (this.#bootPromise) {
-      if (options?.previewOrigin !== this.#bootPreviewOrigin) {
+      if (previewOrigin !== this.#bootPreviewOrigin) {
         return Promise.reject(new RuntimeError('BOOT_FAILED', 'Runtime boot options cannot change while boot is in progress.'));
       }
       return this.#bootPromise;
     }
-    this.#bootPreviewOrigin = options?.previewOrigin;
-    this.#bootPromise = this.#boot(options);
+    this.#bootPreviewOrigin = previewOrigin;
+    this.#bootPromise = this.#boot({ ...options, ...(previewOrigin === undefined ? {} : { previewOrigin }) });
     return this.#bootPromise;
   }
 
@@ -601,6 +601,10 @@ function isInvalidPreviewOrigin(previewOrigin: string | undefined): boolean {
   } catch {
     return true;
   }
+}
+
+function normalizePreviewOrigin(previewOrigin: string | undefined): string | undefined {
+  return previewOrigin === undefined ? undefined : new URL(previewOrigin).origin;
 }
 
 function isNonHttpPreviewOrigin(previewOrigin: string | undefined): boolean {

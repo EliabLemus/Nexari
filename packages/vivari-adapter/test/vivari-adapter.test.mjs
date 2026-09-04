@@ -108,6 +108,22 @@ test('forwards an explicit self-hosted preview origin to the owned Vivari boot s
   await runtime.teardown();
 });
 
+test('normalizes a self-hosted preview origin before forwarding it to the owned Vivari boot seam', async () => {
+  const fake = fakeSdk();
+  let receivedOptions;
+  const runtime = createVivariRuntime({
+    id: 'normalized-self-hosted-preview-origin',
+    isIsolated: () => true,
+    loadSdk: async () => ({ boot: async (options) => {
+      receivedOptions = options;
+      return fake.instance;
+    } }),
+  });
+  await runtime.boot({ previewOrigin: 'https://NEXARI.example.test:443/' });
+  assert.equal(receivedOptions.previewOrigin, 'https://nexari.example.test');
+  await runtime.teardown();
+});
+
 test('rejects a conflicting preview origin while the first boot is in progress', async () => {
   const fake = fakeSdk();
   let receivedOptions;
