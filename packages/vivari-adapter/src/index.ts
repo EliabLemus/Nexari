@@ -260,7 +260,16 @@ class NexariVivariRuntime implements BrowserRuntime {
       this.#lifecycle.markTerminated();
       throw new RuntimeError('BOOT_ABORTED', 'Runtime boot was cancelled before the Vivari SDK loaded');
     }
-    if (!this.#isIsolated()) throw new RuntimeError('ISOLATION_REQUIRED', 'Nexari requires cross-origin isolation and SharedArrayBuffer.');
+    let isolated: boolean;
+    try {
+      isolated = this.#isIsolated();
+    } catch (cause) {
+      // Isolation is a hard prerequisite. A host probe that cannot establish it
+      // must fail closed just like an explicit non-isolated browser, while the
+      // untouched lifecycle remains safe to retry once the probe recovers.
+      throw new RuntimeError('ISOLATION_REQUIRED', 'Nexari requires cross-origin isolation and SharedArrayBuffer.', cause);
+    }
+    if (!isolated) throw new RuntimeError('ISOLATION_REQUIRED', 'Nexari requires cross-origin isolation and SharedArrayBuffer.');
     this.#lifecycle.beginBoot();
     const abortController = new AbortController();
     this.#bootAbortController = abortController;

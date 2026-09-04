@@ -57,6 +57,29 @@ test('an isolation failure before the SDK loads remains retryable once isolation
   assert.equal(runtime.state, 'terminated');
 });
 
+test('a throwing isolation probe fails closed before SDK loading and remains retryable', async () => {
+  let probeFailure = new Error('isolation probe unavailable');
+  const fake = fakeSdk();
+  const runtime = createVivariRuntime({
+    id: 'throwing-isolation-probe',
+    isIsolated: () => {
+      if (probeFailure) throw probeFailure;
+      return true;
+    },
+    loadSdk: fake.loader,
+  });
+  await assert.rejects(
+    runtime.boot(),
+    (error) => error instanceof RuntimeError && error.code === 'ISOLATION_REQUIRED',
+  );
+  assert.equal(fake.calls.boot, 0);
+  assert.equal(runtime.state, 'created');
+  probeFailure = undefined;
+  await runtime.boot();
+  assert.equal(runtime.state, 'ready');
+  await runtime.teardown();
+});
+
 test('accepts credentialless COEP without forwarding it to the owned Vivari boot seam', async () => {
   const fake = fakeSdk();
   let receivedOptions;
