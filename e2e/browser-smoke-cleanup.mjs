@@ -5,13 +5,13 @@ export async function terminateChild(child, { graceMs = 5_000 } = {}) {
   if (child.exitCode != null || child.signalCode != null) return;
 
   const exited = once(child, 'exit');
-  child.kill('SIGTERM');
+  if (!child.kill('SIGTERM')) return;
   const exitedInGrace = await Promise.race([
     exited.then(() => true),
     new Promise((resolve) => setTimeout(() => resolve(false), graceMs)),
   ]);
   if (exitedInGrace) return;
 
-  child.kill('SIGKILL');
+  if (!child.kill('SIGKILL')) return;
   await exited;
 }
