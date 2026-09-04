@@ -656,7 +656,10 @@ function hasPreviewOriginCredentials(previewOrigin: string | undefined): boolean
 function hasPreviewOriginPathQueryOrFragment(previewOrigin: string | undefined): boolean {
   if (!previewOrigin) return false;
   const { pathname, search, hash } = new URL(previewOrigin);
-  return pathname !== '/' || search.length > 0 || hash.length > 0;
+  // URL normalizes a trailing `?` or `#` to an empty search/hash. They still
+  // express a query or fragment in the supplied URL, so reject them rather
+  // than silently collapsing them into the origin passed to the owned SDK.
+  return pathname !== '/' || search.length > 0 || hash.length > 0 || /[?#]$/.test(previewOrigin);
 }
 
 function unsupportedBootOption(options?: RuntimeBootOptions): 'coep' | 'workdirName' | 'forwardPreviewErrors' | undefined {

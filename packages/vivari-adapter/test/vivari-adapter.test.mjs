@@ -196,6 +196,8 @@ test('rejects a preview URL with a path, query, or fragment before loading the V
     'https://nexari.example.test/preview',
     'https://nexari.example.test/?tenant=nexari',
     'https://nexari.example.test/#preview',
+    'https://nexari.example.test/?',
+    'https://nexari.example.test/#',
   ]) {
     let sdkLoads = 0;
     const runtime = createVivariRuntime({
