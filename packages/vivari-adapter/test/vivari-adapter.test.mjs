@@ -29,6 +29,7 @@ function fakeSdk() {
     emitServerReady: (...args) => listeners.get('server-ready')?.(...args),
     emitPort: (...args) => listeners.get('port')?.(...args),
     emitFsChange: (...args) => listeners.get('fs-change')?.(...args),
+    emitError: (...args) => listeners.get('error')?.(...args),
     attachPreview: () => () => { calls.detach++; },
     export: async () => ({ files: [], truncated: false }),
     teardown: () => { calls.teardown++; },
@@ -1106,6 +1107,20 @@ test('teardown unsubscribes runtime event listeners so stale server events canno
   fake.instance.emitServerReady(3111, 'http://stale.test/');
   assert.equal(fake.calls.unsubscribe, 1);
   assert.equal(received, 0);
+});
+
+test('forwards an owned Vivari runtime failure as a typed host error event', async () => {
+  const fake = fakeSdk();
+  const runtime = createVivariRuntime({ id: 'runtime-error-events', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const received = [];
+  runtime.on('error', (error) => { received.push(error); });
+  const guestFailure = new Error('kernel process supervisor failed');
+  fake.instance.emitError(guestFailure);
+  assert.deepEqual(received, [guestFailure]);
+  await runtime.teardown();
+  fake.instance.emitError(new Error('must not reach a terminated host'));
+  assert.equal(received.length, 1);
 });
 
 test('forwards raw port state as a typed runtime event', async () => {

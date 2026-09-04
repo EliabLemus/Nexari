@@ -29,6 +29,7 @@ export interface VivariLike {
   on(event: 'server-ready', listener: (port: number, url: string) => void): () => void;
   on(event: 'port', listener: (port: number, kind: 'open' | 'close', url: string) => void): () => void;
   on(event: 'fs-change', listener: (event: RuntimeFsChangeEvent) => void): () => void;
+  on(event: 'error', listener: (error: Error) => void): () => void;
   export(path?: string): Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>;
   teardown(): void | Promise<void>;
 }
@@ -468,6 +469,11 @@ class NexariVivariRuntime implements BrowserRuntime {
         if (this.state === 'ready') (listener as (event: RuntimeFsChangeEvent) => void)(change);
       };
       detach = instance.on('fs-change', forwardIfReady);
+    } else if (event === 'error') {
+      const forwardIfReady = (error: Error) => {
+        if (this.state === 'ready') (listener as (error: Error) => void)(error);
+      };
+      detach = instance.on('error', forwardIfReady);
     } else {
       throw new RuntimeError('UNSUPPORTED_CAPABILITY', `Unsupported event ${String(event)}`);
     }

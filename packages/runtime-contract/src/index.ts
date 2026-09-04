@@ -40,6 +40,8 @@ export type RuntimeEventMap = {
   'server-ready': [port: number, url: string];
   'port': [port: number, kind: 'open' | 'close', url: string];
   'fs-change': [event: RuntimeFsChangeEvent];
+  /** An unrecoverable runtime failure surfaced by the owned guest. */
+  'error': [error: Error];
 };
 
 /**
