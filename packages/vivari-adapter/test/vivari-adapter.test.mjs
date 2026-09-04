@@ -249,6 +249,28 @@ test('rejects a string-coercible preview origin before loading the owned Vivari 
   assert.equal(runtime.state, 'created');
 });
 
+test('rejects falsey non-string preview origins before loading the owned Vivari SDK', async () => {
+  for (const previewOrigin of [null, false, 0]) {
+    let sdkLoads = 0;
+    const runtime = createVivariRuntime({
+      id: `falsey-non-string-preview-origin-${String(previewOrigin)}`,
+      isIsolated: () => true,
+      loadSdk: async () => {
+        sdkLoads++;
+        throw new Error('SDK must not load');
+      },
+    });
+    await assert.rejects(
+      runtime.boot({ previewOrigin }),
+      (error) => error instanceof RuntimeError
+        && error.code === 'UNSUPPORTED_CAPABILITY'
+        && error.message === 'Preview origin must be an absolute URL.',
+    );
+    assert.equal(sdkLoads, 0);
+    assert.equal(runtime.state, 'created');
+  }
+});
+
 test('rejects a non-HTTP preview origin before loading the Vivari SDK', async () => {
   let sdkLoads = 0;
   const runtime = createVivariRuntime({

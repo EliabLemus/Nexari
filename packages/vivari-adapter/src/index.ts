@@ -591,7 +591,7 @@ function isStackBlitzPreviewOrigin(previewOrigin: string | undefined): boolean {
 }
 
 function isInvalidPreviewOrigin(previewOrigin: string | undefined): boolean {
-  if (!previewOrigin) return false;
+  if (previewOrigin === undefined) return false;
   // JavaScript callers can bypass the TypeScript contract. Do not coerce an
   // object through URL() and accidentally forward it into the owned SDK.
   if (typeof previewOrigin !== 'string') return true;
