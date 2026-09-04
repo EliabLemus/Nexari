@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { terminateChild } from './browser-smoke-cleanup.mjs';
 
 const cdpUrl = process.env.NEXARI_CHROME_CDP_URL;
 if (!cdpUrl) {
@@ -273,8 +274,10 @@ try {
   console.log('browser lab E2E: PASS (ready server preview followed by safe teardown)');
 } finally {
   browser?.close();
-  preview.kill('SIGTERM');
-  nonIsolatedPreview.kill('SIGTERM');
+  await Promise.all([
+    terminateChild(preview),
+    terminateChild(nonIsolatedPreview),
+  ]);
 }
 
 async function waitFor(check, timeoutMs = 30_000) {
