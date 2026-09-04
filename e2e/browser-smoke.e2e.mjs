@@ -87,6 +87,11 @@ try {
     'credentialless COEP must boot and tear down through the actual isolated browser adapter before the primary runtime starts',
   );
   assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.unsupportedBootOptionsProof`),
+    'workdirName-forwardPreviewErrors-rejected-before-sdk-load',
+    'unsupported WebContainer boot options must fail closed through the actual isolated browser adapter before the primary runtime starts',
+  );
+  assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.abortedBootProof`),
     'boot-aborted-terminated-before-fresh-runtime',
     'a caller-aborted boot of the pinned Vivari adapter must terminate cleanly before the next fresh browser runtime boots',

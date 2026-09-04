@@ -6,7 +6,7 @@ A row is not compatible until its named browser test passes against Nexari's own
 
 | Requirement | Priority | Behavior | Bolt evidence | Required browser proof | Current status |
 |---|---|---|---|---|---|
-| BOLT-WC-001 | must-have | boot: WebContainer.boot accepts coep credentialless, workdirName and forwardPreviewErrors. | app/lib/webcontainer/index.ts:26-30 | e2e/boot-options.spec.ts | unknown |
+| BOLT-WC-001 | must-have | boot: WebContainer.boot accepts coep credentialless, workdirName and forwardPreviewErrors. | app/lib/webcontainer/index.ts:26-30 | e2e/browser-smoke.e2e.mjs (actual browser adapter accepts `coep: 'credentialless'`; `workdirName` and `forwardPreviewErrors` reject explicitly before SDK load) | blocked (credentialless proven; `workdirName` and `forwardPreviewErrors` explicitly unsupported) |
 | BOLT-WC-002 | must-have | preview-diagnostics: Runtime accepts preview script injection and emits preview diagnostics to the host. | app/lib/webcontainer/index.ts:37-57 | e2e/preview-diagnostics.spec.ts | unknown |
 | BOLT-WC-003 | must-have | filesystem: Filesystem supports readFile, writeFile, mkdir, readdir and rm with text and binary payloads. | app/lib/stores/files.ts:554-888; app/lib/hooks/useGit.ts:191-311 | e2e/browser-smoke.e2e.mjs (text CRUD, byte-exact binary read/write and nested recursive directory lifecycle) | proven |
 | BOLT-WC-004 | must-have | workdir: Runtime exposes a stable workdir used for path translation by actions, persistence and git. | app/lib/runtime/action-runner.ts:317-466; app/lib/hooks/useGit.ts:87-138 | e2e/browser-smoke.e2e.mjs (real guest process observes the adapter's stable root workdir) | proven |

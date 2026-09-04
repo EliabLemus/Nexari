@@ -64,6 +64,26 @@ async function bootRuntime() {
     throw new Error('Vivari adapter teardown did not terminate after accepting credentialless COEP');
   }
   status.dataset.credentiallessCoepProof = 'accepted-and-torn-down';
+  for (const [option, value] of [
+    ['workdirName', 'nexari-project'],
+    ['forwardPreviewErrors', true],
+  ] as const) {
+    const unsupportedRuntime = createVivariRuntime({
+      id: crypto.randomUUID(),
+      loadSdk: loadPinnedVivariSdk,
+    });
+    try {
+      await unsupportedRuntime.boot({ [option]: value });
+      throw new Error(`Vivari adapter accepted unsupported boot option: ${option}`);
+    } catch (error) {
+      if (!(error instanceof Error)
+        || (error as { code?: unknown }).code !== 'UNSUPPORTED_CAPABILITY'
+        || unsupportedRuntime.state !== 'created') {
+        throw error;
+      }
+    }
+  }
+  status.dataset.unsupportedBootOptionsProof = 'workdirName-forwardPreviewErrors-rejected-before-sdk-load';
   const bootAbortController = new AbortController();
   const abortedBootRuntime = createVivariRuntime({ id: crypto.randomUUID(), loadSdk: loadPinnedVivariSdk });
   const abortedBoot = abortedBootRuntime.boot({ signal: bootAbortController.signal });
