@@ -116,6 +116,22 @@ test('rejects a manifest lineage flag that is not a boolean', () => {
   );
 });
 
+test('rejects a migration record quoting a commit distance that contradicts the measured counts', () => {
+  const manifest = structuredClone(VALID_MANIFEST);
+  manifest.migration.lineageNote = 'Upstream master descends from the tag (325 commits later).';
+  assert.throws(
+    () => validateSeamProbeReport(baseReport(), manifest),
+    /quotes commit distance\(s\) 325 that contradict the measured counts/,
+  );
+});
+
+test('accepts migration prose that quotes only measured commit distances', () => {
+  const manifest = structuredClone(VALID_MANIFEST);
+  manifest.migration.lineageNote =
+    'The tag is 99 commits behind upstream master; the owned fork is 101 commits behind the tag and 2 ahead of master.';
+  assert.doesNotThrow(() => validateSeamProbeReport(baseReport(), manifest));
+});
+
 test('rejects a supported status that static evidence cannot support', () => {
   const report = baseReport();
   const manifest = structuredClone(VALID_MANIFEST);
