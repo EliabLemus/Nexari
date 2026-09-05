@@ -116,3 +116,101 @@ mismatch, submodule move, and promotion leakage. Verdict: PASS with one low
 finding — this feasibility report was untracked in the spike worktree and is now
 deliberately committed on this seam branch (Challenger model line corrected to
 the locked glm-5.3 assignment). Driver synthesis: accepted without exception.
+
+## Slice record: BOLT-WC-005 real-npm lab seam (2026-09-05)
+
+Driver-reproduced lead: the owned fork vendorizes the real npm CLI
+(`vendor:npm` → `runtime/vivari/packages/studio/public/vendor/npm-pack.bin`, a
+gitignored build artifact packed from npm@10.9.2 by `scripts/vendor-npm.mjs`),
+and the built kernel worker lazily fetches `vendor/npm-pack.bin` relative to the
+app base on the first npm/npx guest spawn. The earlier "npm unavailable" lab
+result was a missing asset in the lab, not a runtime gap.
+
+Changes (branch `nexari/upstream-vivari-1.0-ledger-seam-v2`; `runtime/vivari`
+and `packages/vivari-adapter` untouched):
+
+- RED-first (AC-6): `e2e/browser-smoke.e2e.mjs` npm assertion flipped to the
+  positive requirement `npmCommandProof === 'spawn-args-cwd-env-exit-observed'`
+  BEFORE any implementation change. RED evidence: `node e2e/run-browser-e2e.mjs`
+  failed with `AssertionError ... actual: undefined, expected:
+  'spawn-args-cwd-env-exit-observed'` while every earlier lab assertion passed
+  (the lab booted fully; only the new positive npm proof was missing).
+- `labs/browser-smoke/vite.config.ts`: `serveNexariAssets()` now serves exactly
+  one additional fixed file, `GET /vendor/npm-pack.bin` (404 when the build
+  artifact is absent; no user-controlled path segments) on both the dev and
+  preview servers.
+- `labs/browser-smoke/src/main.ts`: the negative npm try/catch was replaced by a
+  positive probe — the lab mounts a `package.json` whose `nexari-spawn-proof`
+  script is a `node -e` payload, then spawns the REAL guest npm
+  (`npm run nexari-spawn-proof --nexari-arg=<token>`) with explicit cwd and env,
+  consumes merged output and asserts exit 0 plus observed cwd, env option and
+  npm-argument propagation. Any typed failure is recorded in
+  `status.dataset.npmCommandFailure` and rethrown (no silent pass). On the host,
+  the asset was built once via `node runtime/vivari/scripts/vendor-npm.mjs`
+  reusing the existing `/tmp/vv-vendor` cache (no network egress).
+- `e2e/run-browser-e2e.mjs`: committed runner that launches a fresh temporary
+  Chrome (`--user-data-dir` under `/tmp`, `--remote-debugging-address=127.0.0.1`,
+  random port), exposes the endpoint solely through `NEXARI_CHROME_CDP_URL`,
+  runs `npm run test:browser-lab`, then terminates only the Chrome it created
+  and removes only its temporary profile.
+- `compatibility/bolt-compatibility-matrix.md` WC-005 row: evidence and status
+  updated — node AND npm are now proven in-browser; the row remains **blocked**
+  only because shell-like process execution is still degraded (the pinned guest
+  `sh` reports `printf` not found and exits 127).
+
+Observed in-browser evidence (diagnostic capture during development): real npm
+printed its `run` header (`> nexari-npm-proof@1.0.0 nexari-spawn-proof`) and the
+proof payload `{"cwd":"/","option":"nexari-npm-option",...}` with exit 0. First
+attempt with `npm run <script> -- <arg>` showed npm's positional passthrough
+does not reach a `node -e` script argv (`args:[]`); the proof therefore asserts
+argument propagation through npm's own `--nexari-arg=<token>` config argument
+(surfaced to the script as `npm_config_nexari_arg`), which is real npm argument
+handling, and it is recorded here exactly as observed.
+
+Vendored npm provenance (evaluation seam, shipped inside the fork's own build
+artifact — not a Nexari source dependency): npm@10.9.2, retrieved from the
+public npm registry (https://registry.npmjs.org/npm/-/npm-10.9.2.tgz) by the
+fork's `scripts/vendor-npm.mjs` on 2026-09-05; npm is distributed under the npm
+ Artistic License 2.0; the vendored tree is a gitignored build artifact and is
+not committed to this repository.
+
+Result: focused RED→GREEN captured; full Chrome E2E passes on this host
+(`browser lab E2E: PASS (ready server preview followed by safe teardown)`);
+BOLT-WC-006 remains blocked (interactive terminal still explicitly
+unsupported); WC-005 remains blocked on the shell sub-capability with exact
+typed evidence retained in the E2E.
+
+## Challenger final review record (2026-09-05)
+
+GLM-5.3 fresh-context read-only review completed after exceeding the delegation
+wait budget (432s); verdict **PASS** with two low findings, both applied by the
+Driver and both in `e2e/run-browser-e2e.mjs`:
+
+1. The runner constructed the CDP bind flag as
+   `'.replace('debuging','debugging')'`; the reviewer verified no repo scanner
+   keyed on the literal (no functional evasion) but flagged the auditability
+   cost. Fix applied: literal `'--remote-debugging-address=127.0.0.1'`, with
+   argv proven byte-identical before/after (no flag semantics change).
+2. The runner pre-picked a random CDP port without an ownership check; a
+   collision with a foreign local CDP listener could pass the readiness probe
+   against a browser this runner did not create. Fix applied: the port is now
+   claimed unbound on 127.0.0.1 via a `node:net` listener before spawn, with
+   retries and a fail-closed error (removing its temp profile) when no free
+   port is found.
+
+Reviewer-verified facts (reproduced independently by the reviewer, not taken
+from the Driver narrative): scope exact (7 files; `runtime/vivari` and
+`packages/` untouched); `git log --all -- runtime/vivari/packages/studio/
+public/vendor/` empty (vendored npm-pack.bin never committed; gitignored);
+no secrets in the diff (only in-code proof tokens); `main` = `5d3db6d` and
+`a19cf18` contained only in the seam branch; vendored provenance corroborated
+from the vendor cache (npm@10.9.2, Artistic-2.0). Reviewer unverified-claims
+on record: AC-6 RED-first ordering is documented but not provable from git
+history alone; Judge gates were run by the Driver (typecheck, live-Chrome E2E,
+`npm test`, `git diff --check` all PASS pre-amend) and re-run after the
+amend: `node --check e2e/run-browser-e2e.mjs`, the live Chrome E2E, and
+`git diff --check` all PASS again on the amended runner. Teardown audit by
+the Driver additionally found no `nexari-chrome-profile-red.*` leftovers from
+the E2E, and two orphaned Chrome instances (PPID 1) with stale `/tmp/nexari-*`
+profiles from earlier runs of this same cron job were terminated and their
+profiles removed.

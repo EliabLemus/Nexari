@@ -14,6 +14,11 @@ function serveNexariAssets(): Plugin {
   const assetsDir = path.resolve(fileURLToPath(new URL('../../runtime/vivari/packages/core/dist/assets/', import.meta.url)));
   const swPath = fileURLToPath(new URL('../../runtime/vivari/packages/core/dist/assets/sw.js', import.meta.url));
   if (!fs.existsSync(swPath)) throw new Error('Vivari SDK dist is missing; run npm run build:vivari from the Nexari root.');
+  // The pinned fork's kernel worker lazily fetches the vendored real-npm asset
+  // ("vendor/npm-pack.bin", built by the fork's `vendor:npm` script) relative to
+  // the app base on the first npm/npx guest spawn. Serve exactly that one fixed
+  // file from the lab origin when it exists; any other /vendor path 404s.
+  const npmPackPath = fileURLToPath(new URL('../../runtime/vivari/packages/studio/public/vendor/npm-pack.bin', import.meta.url));
   const middleware = (req: { url?: string }, res: any, next: () => void) => {
     for (const [name, value] of Object.entries(isolation)) res.setHeader(name, value);
     const pathname = (req.url ?? '').split('?')[0];
@@ -21,6 +26,11 @@ function serveNexariAssets(): Plugin {
       res.setHeader('Content-Type', 'text/javascript');
       res.setHeader('Service-Worker-Allowed', '/');
       res.end(fs.readFileSync(swPath));
+      return;
+    }
+    if (pathname === '/vendor/npm-pack.bin' && fs.existsSync(npmPackPath)) {
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.end(fs.readFileSync(npmPackPath));
       return;
     }
     if (pathname.startsWith('/assets/')) {

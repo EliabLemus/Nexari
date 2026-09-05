@@ -235,15 +235,49 @@ async function bootRuntime() {
     throw new Error('Vivari process cwd, environment or argument proof failed');
   }
   status.dataset.processOptionsProof = 'cwd-env-args-exit';
+  // Positive real-npm proof (BOLT-WC-005 seam): the pinned fork's kernel worker
+  // lazily fetches the vendored npm asset from the lab origin and puts the real
+  // npm CLI on the guest PATH on first npm/npx spawn. A `run` script executes
+  // through the guest shell with `node` available (the fork's own spike-npm
+  // Phase 2 proves lifecycle scripts), so the proof script is `node -e`.
+  const npmProofPackage = {
+    name: 'nexari-npm-proof',
+    version: '1.0.0',
+    scripts: {
+      'nexari-spawn-proof': `node -e "process.stdout.write(JSON.stringify({ cwd: process.cwd(), option: process.env.NEXARI_PROCESS_OPTION, args: process.argv.slice(2), npmArgs: process.env.npm_config_nexari_arg }))"`,
+    },
+  };
+  await runtime.fs.writeFile('/package.json', JSON.stringify(npmProofPackage, null, 2));
+  const npmProofToken = 'nexari-npm-option';
+  const npmProofArgument = 'nexari-npm-argument';
+  let npmOutput = '';
+  let npmExitCode: number | undefined;
   try {
-    await runtime.spawn('npm', ['run', 'nexari-spawn-proof']);
-    throw new Error('Vivari unexpectedly exposed npm without browser compatibility evidence');
+    const npmProcess = await runtime.spawn('npm', ['run', 'nexari-spawn-proof', `--nexari-arg=${npmProofArgument}`], {
+      cwd: runtime.workdir,
+      env: { NEXARI_PROCESS_OPTION: npmProofToken },
+    });
+    for await (const chunk of npmProcess.output) npmOutput += chunk;
+    npmExitCode = await npmProcess.exit;
   } catch (error) {
-    if (!(error instanceof Error) || (error as { code?: unknown }).code !== 'COMMAND_NOT_FOUND') {
-      throw error;
-    }
+    const code = (error as { code?: unknown })?.code;
+    status.dataset.npmCommandFailure = `${code ?? 'unknown'}:${error instanceof Error ? error.message : String(error)}`;
+    throw new Error(`Vivari real-npm browser proof failed; capture recorded in npmCommandFailure: ${status.dataset.npmCommandFailure}`);
   }
-  status.dataset.npmCommandUnavailableProof = 'command-not-found';
+  let observedNpm: { cwd?: string; option?: string; args?: string[]; npmArgs?: string };
+  try {
+    observedNpm = JSON.parse(npmOutput.trim().split('\n').filter(Boolean).pop() ?? '');
+  } catch {
+    observedNpm = {};
+  }
+  if (npmExitCode !== 0
+    || observedNpm.cwd !== runtime.workdir
+    || observedNpm.option !== npmProofToken
+    || observedNpm.npmArgs !== npmProofArgument) {
+    status.dataset.npmCommandFailure = `exit=${String(npmExitCode)} output=${JSON.stringify(npmOutput.slice(0, 400))}`;
+    throw new Error(`Vivari real-npm cwd, environment, argument or exit proof failed: ${status.dataset.npmCommandFailure}`);
+  }
+  status.dataset.npmCommandProof = 'spawn-args-cwd-env-exit-observed';
   const shellToken = 'nexari-shell-process';
   const shellProcess = await runtime.spawn('sh', ['-c', `printf ${shellToken}`]);
   let shellOutput = '';

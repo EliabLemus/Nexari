@@ -179,9 +179,9 @@ try {
     'the owned Vivari process bridge must apply cwd, environment variables and arguments before the server starts',
   );
   assert.equal(
-    await evaluate(`document.querySelector('#status')?.dataset.npmCommandUnavailableProof`),
-    'command-not-found',
-    'the owned Vivari process bridge must surface unavailable npm as an explicit typed error rather than silently degrading',
+    await evaluate(`document.querySelector('#status')?.dataset.npmCommandProof`),
+    'spawn-args-cwd-env-exit-observed',
+    'the owned Vivari process bridge must prove real npm execution with npm arguments, cwd, environment and observed exit before the server starts',
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.shellCommandUnavailableProof`),
