@@ -25,13 +25,14 @@ git merge-base 2629c710 26f1d622  ->  2629c710 (the tag itself)
 is-ancestor 2629c710 26f1d622     ->  true (strict ancestor)
 owned..candidate                  ->  0 commits
 candidate..owned                  ->  101 commits (v1.0.0-101-g26f1d62)
+tag..upstream master              ->   99 commits; master..owned -> 2 commits
 owned -> candidate diff           ->  473 files, +3,978/-149,751
 ```
 
-`@vivari/core@1.0.0` is a **strict ancestor** of the owned fork: upstream master
-`9a89ff3` descends from the tag, and the owned runtime is upstream master plus two
+`2629c710` is a **strict ancestor** of the owned fork: upstream master
+`9a89ff3` descends from the tag (99 commits later), and the owned runtime is upstream master plus two
 local commits (1 file, +10/-2). Adopting the published 1.0.0 would be a reverse
-migration that discards 325 commits of upstream progress plus the local fixes. The
+migration that discards 99 commits of upstream progress plus the local fixes. The
 decision boundary below is retained as a historical record; the seam guard now
 measures lineage itself (`merge-base --is-ancestor`) and fails closed on any
 manifest that contradicts the measured topology.
@@ -97,7 +98,7 @@ two remaining capability gates, BOLT-WC-005 and BOLT-WC-006.
 
 Candidate remains **blocked from adoption**, but for the corrected reason: the
 published tag is an ancestor of the owned fork, so adopting it would be a reverse
-migration (downgrade) that discards 325 upstream commits and the owned local
+migration (downgrade) that discards 99 upstream commits and the owned local
 fixes, and its static evidence is still insufficient for either remaining
 capability. BOLT-WC-005 remains blocked (`npm` unavailable in the current browser
 proof); BOLT-WC-006 remains blocked (interactive terminal explicitly

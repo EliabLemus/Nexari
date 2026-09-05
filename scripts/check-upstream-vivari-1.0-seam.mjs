@@ -16,6 +16,17 @@ const OWNED_FORK_GITLINK = '26f1d6222942a09411292ea6e55053f3729436ca';
 
 const promotionPattern = /BOLT-WC-00[56][^\n]{0,120}\b(?:proven|compatible|passes|pass|supported)\b|\b(?:promotes?|proves?)\s+BOLT-WC-00[56]/i;
 
+// Measured 2026-09-05 (git rev-list --count, complete history): the ledger
+// candidate tag is 99 commits behind upstream master 9a89ff3, and the owned
+// fork 26f1d62 is upstream master plus 2 local commits (101 behind the tag).
+// Prose in the manifest may quote commit distances only when they match these
+// measured counts; anything else fails closed like every other lineage claim.
+const MEASURED_COMMIT_DISTANCES = {
+  tagBehindMaster: 99,
+  ownedBehindTag: 101,
+  ownedAheadOfMaster: 2,
+};
+
 async function git(...args) {
   const { stdout } = await execFileAsync('git', ['-C', runtimeDir, ...args], { encoding: 'utf8' });
   return stdout;
@@ -103,6 +114,22 @@ export function validateSeamProbeReport(report, manifest) {
   if (report.lineage.candidateAncestorOfOwned === declaredUnrelated) {
     throw new Error(
       `the manifest's unrelatedHistoryToCandidate=${declaredUnrelated} contradicts the probed lineage (candidateAncestorOfOwned=${report.lineage.candidateAncestorOfOwned}); fix the record to match measured git topology`,
+    );
+  }
+
+  // Prose lineage records caused the original shallow-artifact confusion, so a
+  // quoted "N commits" distance must agree with the measured counts or the
+  // record is rejected outright.
+  const quotedDistances = [
+    ...JSON.stringify(manifest.migration ?? {}).matchAll(/(\d+)\s+commits?/g),
+  ].map((match) => Number(match[1]));
+  const allowed = new Set(Object.values(MEASURED_COMMIT_DISTANCES));
+  const bogus = quotedDistances.filter((count) => !allowed.has(count));
+  if (bogus.length > 0) {
+    throw new Error(
+      `the migration record quotes commit distance(s) ${bogus.join(', ')} that contradict the measured counts ` +
+        `(tag behind master ${MEASURED_COMMIT_DISTANCES.tagBehindMaster}, owned behind tag ${MEASURED_COMMIT_DISTANCES.ownedBehindTag}, ` +
+        `owned ahead of master ${MEASURED_COMMIT_DISTANCES.ownedAheadOfMaster}); correct the prose or re-measure before recording`,
     );
   }
 
