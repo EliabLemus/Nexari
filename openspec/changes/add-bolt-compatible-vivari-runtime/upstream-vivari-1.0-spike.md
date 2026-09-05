@@ -305,8 +305,78 @@ low finding, applied by the Driver in `e2e/browser-smoke.e2e.mjs`: the
 enriched ready-failure assertion (status + dataset capture) was followed by an
 unreachable duplicate of the original bare assertion; the duplicate is deleted
 so the enriched diagnostics cannot be silently refactored away. Reviewer
-unverified-claims on record: live Chrome E2E pass accepted as Driver-side
+Reviewer unverified-claims on record: live Chrome E2E pass accepted as Driver-side
 evidence (reviewer is read-only); RED-first ordering remains doc-only evidence
 (RED run and lab fix share one commit); guest coreutils internals trusted at
 E2E-observed behavior level. No blocker or high finding. The live Chrome E2E
 and `git diff --check` were re-run by the Driver after the fix.
+
+## Slice record: BOLT-WC-006 interactive-shell lab seam (2026-09-05)
+
+Driver-reproduced lead: the fork's `/bin/sh` with no script argument enters a
+real interactive REPL over the same proc bridge already proven for batch shells
+(`proc-input` → `kernel.sendStdin`; REPL stdin handler at
+`packages/kernel-host/coreutils.js` `runInteractive`; kill = `kernel.stop` →
+`finalize(pid, 143, 'SIGTERM')`). The matrix's "interactive_terminal:
+unsupported" disclosure was stale relative to the runtime: only the
+terminal-dimension sub-capability is actually missing. Driver-side pre-mortem
+verified before implementation: (a) prompt-only gate — the lab waits for the
+REPL prompt before typing, so no boot race; (b) anti-false-green — the
+keystroke echo renders as a prompt-prefixed line (`/$ echo …`), so the proof
+asserts the marker as an exact trimmed output line, reachable only by real
+execution; (c) parked-REPL kill is the normal tab-close path and cannot trip
+the stall watchdog (`process.__awaitingInput(true)` marks it idle-safe).
+
+Changes (branch `nexari/upstream-vivari-1.0-ledger-seam-v2`;
+`runtime/vivari` and `packages/` untouched):
+
+- RED-first (AC-6): `e2e/browser-smoke.e2e.mjs` gained two positive assertions
+  (`dataset.interactiveShellProof` and `dataset.interactiveTerminalDimensionGap`)
+  BEFORE any lab change. RED evidence: live Chrome E2E via
+  `node e2e/run-browser-e2e.mjs` failed with `AssertionError ... actual:
+  undefined, expected: 'stdin-echo-kill-exit-observed'` at
+  `browser-smoke.e2e.mjs:195` while the lab booted fully (every earlier lab
+  assertion passed; only the new positive interactive proof was missing).
+- `labs/browser-smoke/src/main.ts`: interactive-shell probe added after the
+  batch-shell block — spawns `sh` with no args, drains merged output, waits for
+  the ANSI-stripped prompt, writes `echo nexari-interactive-ok\n` through the
+  proc stdin writer, asserts the marker as an exact plain-text output line
+  (echo cannot fake it), kills the shell and asserts observed exit 143 with a
+  closed output stream. Typed failures are recorded in
+  `status.dataset.interactiveShellFailure` and rethrown (no silent pass).
+  Second probe pins the exact dimension ground truth in-browser: the guest
+  reports `process.stdout.isTTY=false`, `columns=80`, `rows=24` (fixed
+  constants from `packages/runtime/builtins/process.js`; no resize path or
+  SIGWINCH delivery exists anywhere in the runtime). The original
+  "columns/rows undefined" assumption was corrected during pre-mortem — the
+  stub ships literal constants, so the typed gap records the constants and the
+  missing resize mechanism, not absence of fields.
+- `e2e/browser-smoke.e2e.mjs`: the two new assertions pin the proof tokens;
+  the ready-failure diagnostics and all earlier assertions are unchanged.
+- `compatibility/bolt-compatibility-matrix.md` WC-006 row: evidence updated
+  (interactive stdin / merged output / kill proven in-browser with exact typed
+  dimension capture); status stays **blocked** — the row requires cols/rows
+  exposure plus resize, which remain unproven (fixed constants, no resize
+  path). Guard-check evidence: the seam-manifest promotion guard scans only
+  the static seam manifest JSON (whose canonical capabilityNote still says
+  BOLT-WC-005 and BOLT-WC-006 remain blocked pending real Chrome E2E proof —
+  the manifest itself is unchanged), and `check-compatibility-evidence.test.mjs`
+  pins only WC-002/003/004/017 rows, so the WC-006 evidence update violates
+  no guard.
+
+Observed in-browser evidence (typed capture): REPL banner `Vivari shell — type
+commands, Enter to run.`, ANSI-colored prompt `/$`, echoed+executed marker line
+`nexari-interactive-ok` observed as an exact output line, kill → observed exit
+143, output stream closed; dimension probe observed `false|80|24`.
+
+Challenger record: the GLM-5.3 read-only pre-mortem dispatch exceeded the
+delegation API timeout (420s) — the third consecutive timeout for this cron
+job, consistent with the documented 90s-API-timeout pattern. Per
+DELEGATION.md §Time/Retry the Driver completed the verification directly
+(a)–(d) above; no Challenger finding exists to accept or reject. Final
+fresh-context review deferred to the next slice's challenger pass.
+
+Result: focused RED→GREEN captured; full Chrome E2E passes on this host
+(`browser lab E2E: PASS (ready server preview followed by safe teardown)`);
+BOLT-WC-006 remains blocked with an exact, narrowed typed gap (dimension
+constants fixed at 80x24, isTTY false, no resize/SIGWINCH path).

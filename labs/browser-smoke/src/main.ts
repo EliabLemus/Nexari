@@ -327,6 +327,83 @@ async function bootRuntime() {
     status.dataset.shellCommandFailure = `sh-c-false exit=${String(shellFalseExit)} output=${JSON.stringify(shellFalseOutput.slice(0, 200))}`;
     throw new Error(`Vivari shell non-zero exit propagation proof failed: ${status.dataset.shellCommandFailure}`);
   }
+  // Positive interactive-shell proof (BOLT-WC-006 seam): the fork's /bin/sh with
+  // no script argument enters a real interactive REPL (coreutils.js
+  // runInteractive) over the same proc stdin/output/kill bridge proven above.
+  // The lab waits for the REPL prompt before typing, so early bytes cannot race
+  // the boot (stdin chunks pushed before a consumer are buffered, not dropped);
+  // the executed marker must appear as an exact output line, which the
+  // keystroke echo (prompt-prefixed `/$ echo …`) cannot fake. Kill resolves
+  // exit 143 (kernel stop → SIGTERM finalize) and closes the output stream, so
+  // a browser-embedded shell session ends exactly like a killed local one.
+  const interactiveToken = 'nexari-interactive-ok';
+  let interactiveOutput = '';
+  let interactiveExit: number | undefined;
+  // The REPL colors its prompt and redraws lines with ANSI escapes and \r, so
+  // all matching happens on a stripped plain-text projection of the output.
+  const plainInteractive = () => interactiveOutput.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').replace(/\r/g, '');
+  try {
+    const interactiveShell = await runtime.spawn('sh', [], { cwd: runtime.workdir });
+    void (async () => {
+      for await (const chunk of interactiveShell.output) interactiveOutput += chunk;
+    })();
+    const promptSeen = await waitFor(() => plainInteractive().includes('$ '), 10_000);
+    if (!promptSeen || !plainInteractive().includes('Vivari shell')) {
+      status.dataset.interactiveShellFailure = `no-prompt output=${JSON.stringify(interactiveOutput.slice(0, 200))}`;
+      throw new Error(`Vivari interactive shell never showed its prompt: ${status.dataset.interactiveShellFailure}`);
+    }
+    const interactiveWriter = interactiveShell.input.getWriter();
+    await interactiveWriter.write(`echo ${interactiveToken}\n`);
+    const markerSeen = await waitFor(
+      () => plainInteractive().split('\n').some((line) => line.trim() === interactiveToken),
+      10_000,
+    );
+    if (!markerSeen) {
+      status.dataset.interactiveShellFailure = `no-marker output=${JSON.stringify(interactiveOutput.slice(-400))}`;
+      throw new Error(`Vivari interactive shell did not execute the typed command: ${status.dataset.interactiveShellFailure}`);
+    }
+    interactiveShell.kill();
+    interactiveExit = await interactiveShell.exit;
+  } catch (error) {
+    const code = (error as { code?: unknown })?.code;
+    if (!status.dataset.interactiveShellFailure) {
+      status.dataset.interactiveShellFailure = `${code ?? 'unknown'}:${error instanceof Error ? error.message : String(error)}`;
+    }
+    throw error instanceof Error ? error : new Error(String(error));
+  }
+  if (interactiveExit !== 143) {
+    status.dataset.interactiveShellFailure = `kill-exit=${String(interactiveExit)} output=${JSON.stringify(interactiveOutput.slice(-300))}`;
+    throw new Error(`Vivari interactive shell kill/exit proof failed: ${status.dataset.interactiveShellFailure}`);
+  }
+  status.dataset.interactiveShellProof = 'stdin-echo-kill-exit-observed';
+  // Exact WC-006 dimension-gap capture: the guest stdout stub is a plain
+  // writable with fixed constants — isTTY false, columns 80, rows 24
+  // (runtime/vivari/packages/runtime/builtins/process.js) — and no resize path
+  // or SIGWINCH delivery exists anywhere in the runtime. Pin the observed
+  // constants in-browser so the matrix blocked reason names exact evidence.
+  let dimensionsOutput = '';
+  let dimensionsExit: number | undefined;
+  try {
+    const dimensionsScript = [
+      'console.log(process.stdout.isTTY);',
+      'console.log(process.stdout.columns);',
+      'console.log(process.stdout.rows);',
+    ].join('');
+    const dimensionsProcess = await runtime.spawn('sh', ['-c', `node -e ${JSON.stringify(dimensionsScript)}`], { cwd: runtime.workdir });
+    for await (const chunk of dimensionsProcess.output) dimensionsOutput += chunk;
+    dimensionsExit = await dimensionsProcess.exit;
+  } catch (error) {
+    const code = (error as { code?: unknown })?.code;
+    status.dataset.interactiveShellFailure = `dimensions-spawn ${code ?? 'unknown'}:${error instanceof Error ? error.message : String(error)}`;
+    throw new Error(`Vivari guest terminal dimension capture failed; capture recorded in interactiveShellFailure: ${status.dataset.interactiveShellFailure}`);
+  }
+  const dimensionLines = dimensionsOutput.trim().split('\n');
+  const observedDimensions = `${dimensionLines.at(-3)}|${dimensionLines.at(-2)}|${dimensionLines.at(-1)}`;
+  if (dimensionsExit !== 0 || observedDimensions !== 'false|80|24') {
+    status.dataset.interactiveShellFailure = `dimensions exit=${String(dimensionsExit)} output=${JSON.stringify(dimensionsOutput.slice(0, 300))}`;
+    throw new Error(`Vivari guest terminal dimension capture failed: ${status.dataset.interactiveShellFailure}`);
+  }
+  status.dataset.interactiveTerminalDimensionGap = 'guest-stdout-isTTY-false-columns-80-rows-24-no-resize-path';
   if (capabilities.interactive_terminal !== 'unsupported') {
     throw new Error('Vivari interactive terminal support must remain explicitly unavailable until a browser proof exists');
   }

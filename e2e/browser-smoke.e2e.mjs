@@ -192,6 +192,16 @@ try {
     'sh-args-cwd-env-exit-observed',
     'the owned Vivari process bridge must prove real shell execution with arguments, cwd, environment and observed exit before the server starts',
   );
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.interactiveShellProof`),
+    'stdin-echo-kill-exit-observed',
+    'the owned Vivari process bridge must prove an interactive guest shell (typed stdin, executed marker line, kill and observed exit) before the server starts',
+  );
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.interactiveTerminalDimensionGap`),
+    'guest-stdout-isTTY-false-columns-80-rows-24-no-resize-path',
+    'the browser lab must capture the exact interactive-terminal dimension gap (fixed guest stdout constants, no resize path) while BOLT-WC-006 remains blocked',
+  );
   assert.match(
     await evaluate(`document.querySelector('#status')?.dataset.portOpen`),
     /^3111:\/preview\/3111\/$/,
