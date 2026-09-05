@@ -8,7 +8,8 @@ const OWNED_SHA = '26f1d6222942a09411292ea6e55053f3729436ca';
 const VALID_MANIFEST = {
   migration: {
     candidate: { package: '@vivari/core', version: '1.0.0', sha: CANDIDATE_SHA },
-    lineageNote: 'v1.0.0 is an ancestor of upstream master; the owned fork is re-rooted and unrelated.',
+    ownedFork: { unrelatedHistoryToCandidate: false },
+    lineageNote: 'v1.0.0 is a strict ancestor of the owned fork (101 commits behind).',
   },
   capabilityNote:
     'This manifest records the static migration seam only. It does not claim BOLT-WC-005 or BOLT-WC-006 compatibility; both remain blocked pending real Chrome E2E proof.',
@@ -39,6 +40,7 @@ function baseReport() {
     candidateSha: CANDIDATE_SHA,
     gitlinkSha: OWNED_SHA,
     submoduleClean: true,
+    lineage: { candidateAncestorOfOwned: true },
     sources: {
       'packages/core/src/vivari.ts': 'export class Vivari {\n  static async boot(options = {}) {\n  }\n}',
       'packages/core/src/process.ts': 'export class VivariProcess {\n  kill(): void {\n  }\n}',
@@ -84,6 +86,33 @@ test('fails closed when the submodule moved off the owned fork pin', () => {
   assert.throws(
     () => validateSeamProbeReport(report, VALID_MANIFEST),
     /must stay pinned to the owned fork/,
+  );
+});
+
+test('rejects a manifest whose unrelatedHistoryToCandidate contradicts the probed lineage', () => {
+  const report = baseReport();
+  report.lineage.candidateAncestorOfOwned = false;
+  assert.throws(
+    () => validateSeamProbeReport(report, VALID_MANIFEST),
+    /contradicts the probed lineage/,
+  );
+});
+
+test('rejects a probe report that never measured lineage', () => {
+  const report = baseReport();
+  delete report.lineage;
+  assert.throws(
+    () => validateSeamProbeReport(report, VALID_MANIFEST),
+    /must record lineage/,
+  );
+});
+
+test('rejects a manifest lineage flag that is not a boolean', () => {
+  const manifest = structuredClone(VALID_MANIFEST);
+  manifest.migration.ownedFork.unrelatedHistoryToCandidate = 'false';
+  assert.throws(
+    () => validateSeamProbeReport(baseReport(), manifest),
+    /unrelatedHistoryToCandidate must be a boolean/,
   );
 });
 

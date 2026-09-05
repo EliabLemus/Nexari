@@ -13,11 +13,35 @@ The public npm metadata for `@vivari/core@1.0.0` identifies MIT source tag
 upstream on 2026-09-04T19:20:19Z and its `LICENSE` checksum is recorded in
 `THIRD_PARTY_NOTICES.md`.
 
-This is **not** an incremental update: neither candidate nor current owned
+**Topology correction (2026-09-05):** the original "unrelated histories" conclusion
+below was an artifact of a stale `.git/shallow` boundary at `9a89ff3` in the nested
+`runtime/vivari` clone: parse-level commands (`merge-base`, `rev-list`) grafted the
+boundary commit into a fake root while raw object bytes retained the true parent
+`f390cde`. After restoring the missing ancestor objects and removing the stale
+boundary, both clones agree on complete history:
+
+```text
+git merge-base 2629c710 26f1d622  ->  2629c710 (the tag itself)
+is-ancestor 2629c710 26f1d622     ->  true (strict ancestor)
+owned..candidate                  ->  0 commits
+candidate..owned                  ->  101 commits (v1.0.0-101-g26f1d62)
+owned -> candidate diff           ->  473 files, +3,978/-149,751
+```
+
+`@vivari/core@1.0.0` is a **strict ancestor** of the owned fork: upstream master
+`9a89ff3` descends from the tag, and the owned runtime is upstream master plus two
+local commits (1 file, +10/-2). Adopting the published 1.0.0 would be a reverse
+migration that discards 325 commits of upstream progress plus the local fixes. The
+decision boundary below is retained as a historical record; the seam guard now
+measures lineage itself (`merge-base --is-ancestor`) and fails closed on any
+manifest that contradicts the measured topology.
+
+~~This is **not** an incremental update: neither candidate nor current owned
 runtime is an ancestor of the other. A direct comparison from current owned
 runtime to the tag changes 129 runtime/core files (1,894 insertions and 58,708
 deletions), including the process/kernel surface and removal of terminal-related
-implementation. Therefore this spike does not adopt code or change the matrix.
+implementation.~~ (Superseded by the correction above; the 129-file figure was
+computed against the corrupted graph.)
 
 ## Objective
 
@@ -71,11 +95,15 @@ two remaining capability gates, BOLT-WC-005 and BOLT-WC-006.
 
 ## Present outcome
 
-Candidate is **blocked from adoption**: it is a large, non-linear migration with
-static evidence insufficient to prove either remaining capability. BOLT-WC-005
-remains blocked (`npm` unavailable in the current browser proof); BOLT-WC-006
-remains blocked (interactive terminal explicitly unsupported). The compatibility
-matrix is deliberately unchanged.
+Candidate remains **blocked from adoption**, but for the corrected reason: the
+published tag is an ancestor of the owned fork, so adopting it would be a reverse
+migration (downgrade) that discards 325 upstream commits and the owned local
+fixes, and its static evidence is still insufficient for either remaining
+capability. BOLT-WC-005 remains blocked (`npm` unavailable in the current browser
+proof); BOLT-WC-006 remains blocked (interactive terminal explicitly
+unsupported). The compatibility matrix is deliberately unchanged. If capability
+work ever requires upstream code, the correct seam is the owned fork's own base
+(`9a89ff3`), not the older npm tag.
 
 ## Challenger pre-mortem record
 

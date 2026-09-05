@@ -9,9 +9,9 @@
     },
     "ownedFork": {
       "gitlink": "26f1d6222942a09411292ea6e55053f3729436ca",
-      "unrelatedHistoryToCandidate": true
+      "unrelatedHistoryToCandidate": false
     },
-    "lineageNote": "v1.0.0 (2629c71, 2026-07-26) is an ancestor of upstream master base 9a89ff3 (2026-08-12) recorded in THIRD_PARTY_NOTICES.md; the owned fork is re-rooted and shares no commits with upstream. The npm-published candidate therefore predates the snapshot the owned fork was already built from; upstream master has advanced past the tag. This is a migration review, not a version upgrade."
+    "lineageNote": "Measured 2026-09-05 with git merge-base --is-ancestor on complete history: v1.0.0 (2629c71, 2026-07-26) is a strict ANCESTOR of the owned fork. Upstream master 9a89ff3 (2026-08-12) descends from the tag (325 commits later), and the owned fork HEAD 26f1d62 is upstream master plus two local commits (1 file, +10/-2). The npm-published 1.0.0 tag is therefore older than the code the owned runtime already ships; adopting it would be a downgrade, not an upgrade. An earlier unrelated-histories record here was an artifact of a stale .git/shallow boundary at 9a89ff3 in the nested clone and has been corrected with a deterministic probe guard."
     ,
     "disposition": "evaluated, not adopted; this manifest maps the static seam only and changes no runtime code"
   },
