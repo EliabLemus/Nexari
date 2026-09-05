@@ -53,6 +53,12 @@ export async function probeSeam() {
   const gitlinkOut = await gitInRoot('ls-tree', 'HEAD', 'runtime/vivari');
   const gitlinkSha = (/^160000 commit (\S+)/.exec(gitlinkOut))?.[1] ?? null;
 
+  // A gitlink move staged in the index never reaches `ls-tree HEAD`, so the
+  // pre-commit window would otherwise slip past the pin. Measure the index too
+  // and fail closed on any staged move (mutation-test finding M1).
+  const indexGitlinkOut = await gitInRoot('ls-files', '-s', 'runtime/vivari');
+  const indexGitlinkSha = (/^160000 (\S+) 0\truntime\/vivari/.exec(indexGitlinkOut))?.[1] ?? null;
+
   const submoduleStatus = (await git('status', '--porcelain')).trim();
   const submoduleClean = submoduleStatus.length === 0;
 
@@ -66,7 +72,14 @@ export async function probeSeam() {
     candidateAncestorOfOwned = false;
   }
 
-  return { candidateSha, gitlinkSha, submoduleClean, lineage: { candidateAncestorOfOwned }, sources: {} };
+  return {
+    candidateSha,
+    gitlinkSha,
+    indexGitlinkSha,
+    submoduleClean,
+    lineage: { candidateAncestorOfOwned },
+    sources: {},
+  };
 }
 
 export async function loadCandidateSources(candidateSha, manifest) {
@@ -95,6 +108,11 @@ export function validateSeamProbeReport(report, manifest) {
   if (report.gitlinkSha !== OWNED_FORK_GITLINK) {
     throw new Error(
       `runtime/vivari must stay pinned to the owned fork ${OWNED_FORK_GITLINK} while the seam is evaluated (found ${report.gitlinkSha})`,
+    );
+  }
+  if (report.indexGitlinkSha !== OWNED_FORK_GITLINK) {
+    throw new Error(
+      `the runtime/vivari gitlink staged in the index must also stay pinned to ${OWNED_FORK_GITLINK} (found ${report.indexGitlinkSha ?? 'no gitlink'})`,
     );
   }
   if (!report.submoduleClean) {
