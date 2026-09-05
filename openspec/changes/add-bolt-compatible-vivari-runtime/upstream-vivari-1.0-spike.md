@@ -380,3 +380,42 @@ Result: focused RED→GREEN captured; full Chrome E2E passes on this host
 (`browser lab E2E: PASS (ready server preview followed by safe teardown)`);
 BOLT-WC-006 remains blocked with an exact, narrowed typed gap (dimension
 constants fixed at 80x24, isTTY false, no resize/SIGWINCH path).
+## Challenger final review record — interactive-shell slice (2026-09-05, fresh context)
+
+GLM-5.3 fresh-context read-only review of `0bd7050` completed (94s, within
+budget — the narrow re-dispatch per DELEGATION.md §Time/Retry broke the
+three-timeout pattern). Independently reproduced: 4-file diff scope (no
+runtime/ or packages/ paths), e2e pins both tokens (`interactiveShellProof` =
+stdin-echo-kill-exit-observed, `interactiveTerminalDimensionGap` =
+guest-stdout-isTTY-false-columns-80-rows-24-no-resize-path), marker asserted as
+an exact trimmed output line, every failure path sets
+`dataset.interactiveShellFailure` and rethrows, matrix WC-006 row still
+blocked, worktree clean. Verdict: **PASS**, one low finding — the diff deletes
+a pre-existing duplicate bare `assert.equal(ready, true, …)` fallback line
+outside the stated slice intent; no action, it is the same cleanup already
+adjudicated and applied in the prior slice's review (`9311727`). Driver closed
+the reviewer's own declared gaps post-hoc: full secret regex scan over the two
+undiffed docs — zero hits.
+
+## Next-slice survey (2026-09-05, closes this contract's remaining question)
+
+The only remaining blocked sub-capability is BOLT-WC-006 terminal
+dimension/resize. Ground truth: `runtime/vivari` is a submodule gitlink pinned
+at `26f1d62` by a fail-closed guard (`scripts/check-upstream-vivari-1.0-seam.mjs`
+lines 15 and 108-118; both HEAD and index are enforced), and the gap lives
+inside the pinned fork (`packages/runtime/builtins/process.js` lines 54-56:
+`isTTY:false, columns:80, rows:24` constants; no resize/SIGWINCH path anywhere
+in kernel-host). Closing it = owned-fork feature work (protocol + kernel +
+process builtin + adapter + runtime-contract) plus a deliberate, documented pin
+move — a Human Owner decision, not an autonomous cron slice. All other matrix
+rows are proven or explicitly typed-blocked at the adapter layer. The spike's
+own frozen gates are all either satisfied or blocked exactly here; nothing
+smaller remains.
+
+**Conclusion:** the upstream-migration feasibility contract is COMPLETE.
+Candidate remains blocked from adoption for the corrected reason (upstream
+v1.0.0 tag `2629c710` is a strict ancestor of the owned fork `26f1d62`; adopting
+it would be a downgrade discarding 99 upstream commits plus local fixes).
+BOLT-WC-005 proven (minimal-shell limits disclosed). BOLT-WC-006 blocked solely
+on the dimension/resize sub-capability, which requires owned-fork feature work
+and a Human-Owner-approved pin move.
