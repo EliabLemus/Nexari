@@ -79,7 +79,6 @@ try {
     const failureDataset = await evaluate(`JSON.stringify(document.querySelector('#status')?.dataset ?? {})`);
     assert.equal(ready, true, `browser lab never reached server-ready state:\nstatus: ${failureStatus}\ndataset: ${failureDataset}\n${previewOutput}`);
   }
-  assert.equal(ready, true, `browser lab never reached server-ready state:\n${previewOutput}`);
   assert.equal(await evaluate('crossOriginIsolated'), true, 'guest runtime must start only in an isolated browser context');
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.selfHostedPreviewOriginProof`),

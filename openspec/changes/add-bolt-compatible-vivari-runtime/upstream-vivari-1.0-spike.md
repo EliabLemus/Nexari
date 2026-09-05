@@ -292,3 +292,21 @@ Result: focused RED→GREEN captured; full Chrome E2E passes on this host
 BOLT-WC-005 proven (node + npm + shell with disclosed minimal-shell limits);
 BOLT-WC-006 remains blocked (interactive terminal still explicitly
 unsupported).
+## Challenger final review record — shell slice (2026-09-05, fresh context)
+
+GLM-5.3 fresh-context read-only review of `2679e50` completed (384s, within
+budget; 12 targeted read-only commands reproduced independently: head/branch
+identity, 13-file diff scope with runtime/ and packages/ untouched, slice-stat
+exactly 4 files, assertion-strengthening diffs for e2e + lab main.ts, matrix +
+seam-manifest consistency, guard pin scopes, secrets regex scan with zero
+matches, node --check, guard test suite 19 pass, both guard scripts OK,
+stale-key consumer grep, proof-line location map). Verdict: **PASS** with one
+low finding, applied by the Driver in `e2e/browser-smoke.e2e.mjs`: the
+enriched ready-failure assertion (status + dataset capture) was followed by an
+unreachable duplicate of the original bare assertion; the duplicate is deleted
+so the enriched diagnostics cannot be silently refactored away. Reviewer
+unverified-claims on record: live Chrome E2E pass accepted as Driver-side
+evidence (reviewer is read-only); RED-first ordering remains doc-only evidence
+(RED run and lab fix share one commit); guest coreutils internals trusted at
+E2E-observed behavior level. No blocker or high finding. The live Chrome E2E
+and `git diff --check` were re-run by the Driver after the fix.
