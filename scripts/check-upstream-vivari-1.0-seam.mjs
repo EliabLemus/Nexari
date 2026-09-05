@@ -45,7 +45,17 @@ export async function probeSeam() {
   const submoduleStatus = (await git('status', '--porcelain')).trim();
   const submoduleClean = submoduleStatus.length === 0;
 
-  return { candidateSha, gitlinkSha, submoduleClean, sources: {} };
+  // Measure lineage against the OWNED fork pin (not a mutable ref) so the
+  // migration-vs-upgrade decision is always derived from real git topology.
+  let candidateAncestorOfOwned = false;
+  try {
+    await git('merge-base', '--is-ancestor', LEDGER_CANDIDATE_SHA, OWNED_FORK_GITLINK);
+    candidateAncestorOfOwned = true;
+  } catch {
+    candidateAncestorOfOwned = false;
+  }
+
+  return { candidateSha, gitlinkSha, submoduleClean, lineage: { candidateAncestorOfOwned }, sources: {} };
 }
 
 export async function loadCandidateSources(candidateSha, manifest) {
@@ -78,6 +88,22 @@ export function validateSeamProbeReport(report, manifest) {
   }
   if (!report.submoduleClean) {
     throw new Error('the nested runtime/vivari submodule is not clean; resolve its uncommitted state first');
+  }
+
+  // The lineage flag must be a measured boolean, and it must agree with the
+  // probe's own merge-base topology. A stale or prose-derived record fails
+  // closed instead of steering the migration decision.
+  if (report.lineage?.candidateAncestorOfOwned !== true && report.lineage?.candidateAncestorOfOwned !== false) {
+    throw new Error('the seam probe must record lineage (candidateAncestorOfOwned); refusing to evaluate the manifest without measured git topology');
+  }
+  const declaredUnrelated = manifest.migration?.ownedFork?.unrelatedHistoryToCandidate;
+  if (typeof declaredUnrelated !== 'boolean') {
+    throw new Error('unrelatedHistoryToCandidate must be a boolean measured against the resolved candidate, not prose');
+  }
+  if (report.lineage.candidateAncestorOfOwned === declaredUnrelated) {
+    throw new Error(
+      `the manifest's unrelatedHistoryToCandidate=${declaredUnrelated} contradicts the probed lineage (candidateAncestorOfOwned=${report.lineage.candidateAncestorOfOwned}); fix the record to match measured git topology`,
+    );
   }
 
   if (!Array.isArray(manifest.seam) || manifest.seam.length === 0) {
