@@ -39,6 +39,7 @@ function baseReport() {
   return {
     candidateSha: CANDIDATE_SHA,
     gitlinkSha: OWNED_SHA,
+    indexGitlinkSha: OWNED_SHA,
     submoduleClean: true,
     lineage: { candidateAncestorOfOwned: true },
     sources: {
@@ -86,6 +87,24 @@ test('fails closed when the submodule moved off the owned fork pin', () => {
   assert.throws(
     () => validateSeamProbeReport(report, VALID_MANIFEST),
     /must stay pinned to the owned fork/,
+  );
+});
+
+test('fails closed when a gitlink move off the pin is staged in the index', () => {
+  const report = baseReport();
+  report.indexGitlinkSha = CANDIDATE_SHA;
+  assert.throws(
+    () => validateSeamProbeReport(report, VALID_MANIFEST),
+    /gitlink staged in the index must also stay pinned/,
+  );
+});
+
+test('fails closed when the index no longer records the runtime/vivari gitlink', () => {
+  const report = baseReport();
+  report.indexGitlinkSha = null;
+  assert.throws(
+    () => validateSeamProbeReport(report, VALID_MANIFEST),
+    /gitlink staged in the index must also stay pinned/,
   );
 });
 
