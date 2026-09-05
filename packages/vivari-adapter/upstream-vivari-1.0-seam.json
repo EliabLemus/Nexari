@@ -1,0 +1,148 @@
+{
+  "migration": {
+    "candidate": {
+      "package": "@vivari/core",
+      "version": "1.0.0",
+      "sha": "2629c71097238400c45aefa213ef61df4794c2b7",
+      "source": "https://github.com/maitrungduc1410/vivari.git",
+      "gitRef": "refs/tags/v1.0.0"
+    },
+    "ownedFork": {
+      "gitlink": "26f1d6222942a09411292ea6e55053f3729436ca",
+      "unrelatedHistoryToCandidate": true
+    },
+    "lineageNote": "v1.0.0 (2629c71, 2026-07-26) is an ancestor of upstream master base 9a89ff3 (2026-08-12) recorded in THIRD_PARTY_NOTICES.md; the owned fork is re-rooted and shares no commits with upstream. The npm-published candidate therefore predates the snapshot the owned fork was already built from; upstream master has advanced past the tag. This is a migration review, not a version upgrade."
+    ,
+    "disposition": "evaluated, not adopted; this manifest maps the static seam only and changes no runtime code"
+  },
+  "capabilityNote": "This manifest records the static migration seam only. It does not claim BOLT-WC-005 or BOLT-WC-006 compatibility; both remain blocked pending real Chrome E2E proof.",
+  "seam": [
+    {
+      "member": "boot(options)",
+      "status": "shape-divergent",
+      "note": "Candidate BootOptions are {compress, serviceWorkerUrl, workerName, devtools}; the adapter contract boots with {signal, previewOrigin, coep, workdirName, forwardPreviewErrors}. No option overlaps, so the adapter loader must translate or reject.",
+      "evidence": [
+        { "path": "packages/core/src/vivari.ts", "contains": "static async boot" },
+        { "path": "packages/core/src/types.ts", "absent": "previewOrigin" }
+      ]
+    },
+    {
+      "member": "boot options: signal",
+      "status": "absent",
+      "note": "No AbortSignal on boot; adapter boot cancellation cannot be forwarded.",
+      "evidence": [{ "path": "packages/core/src/vivari.ts", "absent": "signal" }]
+    },
+    {
+      "member": "boot options: previewOrigin",
+      "status": "absent",
+      "note": "Preview routing is fixed to the same-origin Service Worker; adapter previewOrigin cannot be honored.",
+      "evidence": [{ "path": "packages/core/src/types.ts", "absent": "previewOrigin" }]
+    },
+    {
+      "member": "fs.readFile/writeFile/readdir/mkdir/rm",
+      "status": "supported",
+      "note": "Candidate FileSystemAPI covers the adapter file methods; readdir(withFileTypes) additionally exists.",
+      "evidence": [{ "path": "packages/core/src/fs.ts", "contains": "export class FileSystemAPI" }]
+    },
+    {
+      "member": "fs.watch",
+      "status": "absent",
+      "note": "No watcher API; adapter fs.watch and the fs-change event have no candidate backing.",
+      "evidence": [
+        { "path": "packages/core/src/fs.ts", "contains": "export class FileSystemAPI" },
+        { "path": "packages/core/src/fs.ts", "absent": "watch" }
+      ]
+    },
+    {
+      "member": "mount(tree, {mountPoint, signal})",
+      "status": "shape-divergent",
+      "note": "mountPoint is honored; the AbortSignal option does not exist in the candidate signature.",
+      "evidence": [
+        { "path": "packages/core/src/vivari.ts", "contains": "async mount" },
+        { "path": "packages/core/src/vivari.ts", "absent": "AbortSignal" }
+      ]
+    },
+    {
+      "member": "spawn(command, args, {cwd, env, signal})",
+      "status": "shape-divergent",
+      "note": "cwd/env are forwarded by the candidate; the AbortSignal option is absent (cancellation only via process kill()).",
+      "evidence": [
+        { "path": "packages/core/src/vivari.ts", "contains": "async spawn" },
+        { "path": "packages/core/src/types.ts", "contains": "cwd?: string" },
+        { "path": "packages/core/src/types.ts", "absent": "AbortSignal" }
+      ]
+    },
+    {
+      "member": "attachPreview(iframe)",
+      "status": "absent",
+      "note": "Candidate preview is previewUrl(port)/server-ready plus a same-origin Service Worker; there is no iframe attach/detach API for the adapter to call.",
+      "evidence": [
+        { "path": "packages/core/src/vivari.ts", "contains": "previewUrl" },
+        { "path": "packages/core/src/vivari.ts", "absent": "attachPreview" }
+      ]
+    },
+    {
+      "member": "on('server-ready' | 'port' | 'error')",
+      "status": "supported",
+      "note": "Event names match the adapter seam; the candidate error payload is {message}, so the adapter must wrap it in an Error.",
+      "evidence": [{ "path": "packages/core/src/types.ts", "contains": "VivariEventMap" }]
+    },
+    {
+      "member": "on('fs-change')",
+      "status": "absent",
+      "note": "Candidate event map has no fs-change member.",
+      "evidence": [
+        { "path": "packages/core/src/types.ts", "contains": "VivariEventMap" },
+        { "path": "packages/core/src/types.ts", "absent": "fs-change" }
+      ]
+    },
+    {
+      "member": "export(path)",
+      "status": "absent",
+      "note": "No filesystem export API on the candidate instance.",
+      "evidence": [{ "path": "packages/core/src/vivari.ts", "absent": "async export" }]
+    },
+    {
+      "member": "teardown()",
+      "status": "supported",
+      "note": "Candidate teardown() is synchronous and clears listeners plus the kernel bridge.",
+      "evidence": [{ "path": "packages/core/src/vivari.ts", "contains": "teardown(): void" }]
+    },
+    {
+      "member": "process.output (merged stdio)",
+      "status": "supported",
+      "note": "Candidate merges stdout+stderr into one ReadableStream<string>, matching the adapter's merged-output handling.",
+      "evidence": [{ "path": "packages/core/src/process.ts", "contains": "readonly output: ReadableStream<string>" }]
+    },
+    {
+      "member": "process.stdout / process.stderr",
+      "status": "absent",
+      "note": "No separate stdout/stderr streams exist on VivariProcess.",
+      "evidence": [{ "path": "packages/core/src/process.ts", "absent": "readonly stdout" }]
+    },
+    {
+      "member": "process.input",
+      "status": "supported",
+      "note": "WritableStream<string> stdin; closing sends EOF.",
+      "evidence": [{ "path": "packages/core/src/process.ts", "contains": "readonly input: WritableStream<string>" }]
+    },
+    {
+      "member": "process.exit",
+      "status": "supported",
+      "note": "Promise<number> exit code.",
+      "evidence": [{ "path": "packages/core/src/process.ts", "contains": "readonly exit: Promise<number>" }]
+    },
+    {
+      "member": "process.kill()",
+      "status": "supported",
+      "note": "SIGTERM-equivalent posting proc-kill; exit still resolves.",
+      "evidence": [{ "path": "packages/core/src/process.ts", "contains": "kill(): void" }]
+    },
+    {
+      "member": "process.pid",
+      "status": "absent",
+      "note": "VivariProcess exposes no pid; the adapter contract requires one and has no honest source for it on this candidate.",
+      "evidence": [{ "path": "packages/core/src/process.ts", "absent": "pid" }]
+    }
+  ]
+}
