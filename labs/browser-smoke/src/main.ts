@@ -278,15 +278,55 @@ async function bootRuntime() {
     throw new Error(`Vivari real-npm cwd, environment, argument or exit proof failed: ${status.dataset.npmCommandFailure}`);
   }
   status.dataset.npmCommandProof = 'spawn-args-cwd-env-exit-observed';
+  // Positive shell proof (BOLT-WC-005 seam): the fork's POSIX-ish /bin/sh handles
+  // quoted argv (the `node -e "..."` payload reaches node as one token), &&/||
+  // sequencing, `>` redirects, and spawns external commands with inherited
+  // cwd/env (coreutils.js runSimple/runPipeline; batch exit = last status). The
+  // earlier exit-127 diagnostic was the missing /bin/printf, not a broken shell.
+  // The chain proves args/cwd/env via node's JSON line, then `echo > file`,
+  // `cat` and `rm` through real /bin programs, ending exit 0. A second probe
+  // pins non-zero exit propagation (`sh -c 'false'` must exit 1).
   const shellToken = 'nexari-shell-process';
-  const shellProcess = await runtime.spawn('sh', ['-c', `printf ${shellToken}`]);
+  const shellEnvToken = 'nexari-shell-option';
+  const shellProofScript = `node -e "console.log(JSON.stringify({ cwd: process.cwd(), option: process.env.NEXARI_SHELL_OPTION }))" && echo ${shellToken} > nexari-shell-proof.tmp && cat nexari-shell-proof.tmp && rm nexari-shell-proof.tmp`;
   let shellOutput = '';
-  for await (const chunk of shellProcess.output) shellOutput += chunk;
-  const shellExitCode = await shellProcess.exit;
-  if (shellExitCode !== 127 || !shellOutput.includes('not found')) {
-    throw new Error('Vivari shell compatibility changed; add a positive shell browser proof before exposing it');
+  let shellExitCode: number | undefined;
+  try {
+    const shellProcess = await runtime.spawn('sh', ['-c', shellProofScript], {
+      cwd: runtime.workdir,
+      env: { NEXARI_SHELL_OPTION: shellEnvToken },
+    });
+    for await (const chunk of shellProcess.output) shellOutput += chunk;
+    shellExitCode = await shellProcess.exit;
+  } catch (error) {
+    const code = (error as { code?: unknown })?.code;
+    status.dataset.shellCommandFailure = `${code ?? 'unknown'}:${error instanceof Error ? error.message : String(error)}`;
+    throw new Error(`Vivari shell browser proof failed; capture recorded in shellCommandFailure: ${status.dataset.shellCommandFailure}`);
   }
-  status.dataset.shellCommandUnavailableProof = 'exit-127-diagnostic';
+  if (shellExitCode !== 0) {
+    status.dataset.shellCommandFailure = `exit=${String(shellExitCode)} output=${JSON.stringify(shellOutput.slice(0, 400))}`;
+    throw new Error(`Vivari shell args/cwd/env/exit proof failed: ${status.dataset.shellCommandFailure}`);
+  }
+  const shellJsonLine = shellOutput.split('\n').find((line) => line.startsWith('{'));
+  let observedShell: { cwd?: string; option?: string };
+  try {
+    observedShell = JSON.parse(shellJsonLine ?? '') as { cwd?: string; option?: string };
+  } catch {
+    observedShell = {};
+  }
+  if (observedShell.cwd !== runtime.workdir || observedShell.option !== shellEnvToken || !shellOutput.includes(shellToken)) {
+    status.dataset.shellCommandFailure = `exit=0 output=${JSON.stringify(shellOutput.slice(0, 400))}`;
+    throw new Error(`Vivari shell cwd, environment or sequencing proof failed: ${status.dataset.shellCommandFailure}`);
+  }
+  status.dataset.shellCommandProof = 'sh-args-cwd-env-exit-observed';
+  const shellFalseProcess = await runtime.spawn('sh', ['-c', 'false']);
+  let shellFalseOutput = '';
+  for await (const chunk of shellFalseProcess.output) shellFalseOutput += chunk;
+  const shellFalseExit = await shellFalseProcess.exit;
+  if (shellFalseExit !== 1) {
+    status.dataset.shellCommandFailure = `sh-c-false exit=${String(shellFalseExit)} output=${JSON.stringify(shellFalseOutput.slice(0, 200))}`;
+    throw new Error(`Vivari shell non-zero exit propagation proof failed: ${status.dataset.shellCommandFailure}`);
+  }
   if (capabilities.interactive_terminal !== 'unsupported') {
     throw new Error('Vivari interactive terminal support must remain explicitly unavailable until a browser proof exists');
   }

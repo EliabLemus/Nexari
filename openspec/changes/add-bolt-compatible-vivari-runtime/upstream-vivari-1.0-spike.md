@@ -106,6 +106,11 @@ unsupported). The compatibility matrix is deliberately unchanged. If capability
 work ever requires upstream code, the correct seam is the owned fork's own base
 (`9a89ff3`), not the older npm tag.
 
+(Superseded 2026-09-05: the `npm` sub-capability was proven by the real-npm lab
+seam slice below, and the shell sub-capability was proven by the positive-shell
+lab seam slice below — BOLT-WC-005 is now proven with the minimal-shell
+limitation disclosed in the matrix; BOLT-WC-006 remains blocked.)
+
 ## Challenger pre-mortem record
 
 GLM-5.3 read-only pre-mortem: verified v1.0.0 resolves to ledger SHA
@@ -214,3 +219,76 @@ the Driver additionally found no `nexari-chrome-profile-red.*` leftovers from
 the E2E, and two orphaned Chrome instances (PPID 1) with stale `/tmp/nexari-*`
 profiles from earlier runs of this same cron job were terminated and their
 profiles removed.
+
+## Slice record: BOLT-WC-005 positive shell lab seam (2026-09-05)
+
+Driver-reproduced lead: the earlier pinned `sh -c 'printf …'` → exit 127
+diagnostic was the guest `/bin` lacking `printf`, not a broken shell. The owned
+fork ships a real POSIX-ish `/bin/sh` (`runtime/vivari/packages/kernel-host/
+coreutils.js` `sh:` program): `sh -c <script>` and `sh <file>`, quote-aware
+lexer (quoted spaces preserved, quotes stripped), `;` `&&` `||` sequencing,
+`|` pipes, `< > >> 2> 2>> 2>&1 1> 1>> 1>&2` redirects, `cd/pwd/export/:/true/
+false/history` builtins, `NAME=value` assignment prefix, external commands
+spawned with inherited cwd/env (`runSimple`/`runPipeline`; `envWith`), batch
+exit = last status via `process.exit(status)`. Unsupported (disclosed): `$VAR`
+expansion, globs, background `&`, subshells.
+
+Changes (branch `nexari/upstream-vivari-1.0-ledger-seam-v2`;
+`runtime/vivari` and `packages/` untouched):
+
+- RED-first (AC-6): `e2e/browser-smoke.e2e.mjs` shell assertion flipped to the
+  positive requirement `shellCommandProof === 'sh-args-cwd-env-exit-observed'`
+  BEFORE any lab change. RED evidence: live Chrome E2E via
+  `node e2e/run-browser-e2e.mjs` failed with `AssertionError ... actual:
+  undefined, expected: 'sh-args-cwd-env-exit-observed'` while the lab booted
+  fully (every earlier lab assertion passed; only the new positive shell proof
+  was missing).
+- `labs/browser-smoke/src/main.ts`: the negative `printf` try/except block was
+  replaced by a positive probe — `sh -c 'node -e "console.log(JSON.stringify({
+  cwd, option: process.env.NEXARI_SHELL_OPTION }))" && echo
+  nexari-shell-process > nexari-shell-proof.tmp && cat
+  nexari-shell-proof.tmp && rm nexari-shell-proof.tmp'` with explicit
+  cwd (`runtime.workdir`) and env, proving quoted-argv forwarding, cwd, env,
+  `&&` sequencing, `>` redirect, `cat`, `rm` and observed exit 0; a second
+  probe pins non-zero exit propagation (`sh -c 'false'` must exit 1). Typed
+  failures are recorded in `status.dataset.shellCommandFailure` and rethrown
+  (no silent pass). First GREEN attempt failed exactly as typed-captured:
+  node's `process.stdout.write` emitted no trailing newline so the echo output
+  concatenated onto the JSON line and parsing failed — fixed by `console.log`
+  (JSON on its own line); no assertion was weakened.
+- `e2e/browser-smoke.e2e.mjs`: ready-wait failure path now captures the lab's
+  in-page `#status` textContent and full dataset before asserting, so typed
+  in-page failures surface in the E2E error instead of a bare `false !== true`.
+  The ready assertion itself is unchanged.
+- `compatibility/bolt-compatibility-matrix.md` WC-005 row: evidence and status
+  updated — node, npm AND shell are now proven in-browser; status
+  `blocked` → `proven` with the minimal-shell limitation disclosed
+  (no `$VAR` expansion, globs, background `&`, subshells) and BOLT-WC-006
+  explicitly still blocked. The `Present outcome` section above is annotated as
+  superseded. Guard-check evidence: `check-compatibility-evidence.test.mjs`
+  pins only WC-002/003/004/017 rows; `check-upstream-vivari-1.0-seam.mjs`
+  promotion guard scans only the static seam manifest JSON (canonical
+  capabilityNote untouched — WC-006 remains blocked), so the matrix flip does
+  not violate any guard.
+
+Observed in-browser evidence (typed capture): merged output
+`{"cwd":"/","option":"nexari-shell-option"}` + `nexari-shell-process` with exit
+0 — real quoted `node -e` payload reached the guest node as one argv token with
+the env token and cwd `/` observed by the guest itself; `sh -c 'false'`
+observed exit 1.
+
+Challenger record: two GLM-5.3 read-only pre-mortem dispatches exceeded the
+delegation API timeout (391s / 420s) before a verdict; their transcripts show
+completed verification reads (127-pin consumer grep, `false:` builtin exit 1 at
+coreutils.js:177, batch exit propagation 979-986, E2E waitFor-on-dataset
+pattern, seam-manifest-only promotion guard scope). Driver synthesis adopted
+those verified facts and completed the remaining checks directly
+(check-compatibility-evidence pin scope; no other consumers of
+`shellCommandUnavailableProof` outside e2e/main.ts/docs). No Challenger finding
+was left unaddressed; final review deferred to the next fresh-context pass.
+
+Result: focused RED→GREEN captured; full Chrome E2E passes on this host
+(`browser lab E2E: PASS (ready server preview followed by safe teardown)`);
+BOLT-WC-005 proven (node + npm + shell with disclosed minimal-shell limits);
+BOLT-WC-006 remains blocked (interactive terminal still explicitly
+unsupported).

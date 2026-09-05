@@ -74,6 +74,11 @@ try {
 
   await sessionCommand('Page.navigate', { url: labUrl });
   const ready = await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.state === 'ready'`), 120_000);
+  if (!ready) {
+    const failureStatus = await evaluate(`document.querySelector('#status')?.textContent`);
+    const failureDataset = await evaluate(`JSON.stringify(document.querySelector('#status')?.dataset ?? {})`);
+    assert.equal(ready, true, `browser lab never reached server-ready state:\nstatus: ${failureStatus}\ndataset: ${failureDataset}\n${previewOutput}`);
+  }
   assert.equal(ready, true, `browser lab never reached server-ready state:\n${previewOutput}`);
   assert.equal(await evaluate('crossOriginIsolated'), true, 'guest runtime must start only in an isolated browser context');
   assert.equal(
@@ -184,9 +189,9 @@ try {
     'the owned Vivari process bridge must prove real npm execution with npm arguments, cwd, environment and observed exit before the server starts',
   );
   assert.equal(
-    await evaluate(`document.querySelector('#status')?.dataset.shellCommandUnavailableProof`),
-    'exit-127-diagnostic',
-    'the owned Vivari process bridge must expose the pinned shell limitation rather than silently claiming shell compatibility',
+    await evaluate(`document.querySelector('#status')?.dataset.shellCommandProof`),
+    'sh-args-cwd-env-exit-observed',
+    'the owned Vivari process bridge must prove real shell execution with arguments, cwd, environment and observed exit before the server starts',
   );
   assert.match(
     await evaluate(`document.querySelector('#status')?.dataset.portOpen`),
