@@ -31,6 +31,24 @@ test('BOLT-WC-004 is only marked proven with the browser-lab stable workdir proo
   );
 });
 
+test('BOLT-WC-005 is only marked proven with the bounded browser-lab node, npm, and shell proof', async () => {
+  const matrix = await readFile(matrixUrl, 'utf8');
+  assert.match(
+    matrix,
+    /^\| BOLT-WC-005 \| must-have \| spawn: Runtime spawns node, npm and shell-like guest processes with arguments, cwd\/env and observable exit\. \| app\/lib\/runtime\/action-runner\.ts:395; app\/utils\/shell\.ts:7-89 \| e2e\/browser-smoke\.e2e\.mjs \(real node cwd\/env\/args\/exit; real vendored npm@10\.9\.2 `npm run` with npm arguments, cwd, env and observed exit; real guest `sh -c`: quoted `node -e` argv, cwd, env, `&&` sequencing, `>` redirect with `cat`\/`rm`, observed exit 0, plus `sh -c 'false'` exit 1\) \| proven \(minimal POSIX-ish shell: no `\$VAR` expansion, globs, background `&` or subshells; interactive terminal remains blocked under BOLT-WC-006\) \|$/m,
+    'BOLT-WC-005 must retain its specific browser evidence and disclose its bounded shell limitation',
+  );
+});
+
+test('BOLT-WC-006 remains blocked until browser evidence includes terminal dimensions and resize', async () => {
+  const matrix = await readFile(matrixUrl, 'utf8');
+  assert.match(
+    matrix,
+    /^\| BOLT-WC-006 \| must-have \| terminal: Interactive shell process exposes input, merged output, terminal cols\/rows, resize and kill\. \| app\/utils\/shell\.ts:11-87; app\/lib\/stores\/terminal\.ts:50-61 \| e2e\/browser-smoke\.e2e\.mjs \(real interactive guest `sh` REPL: prompt shown, typed stdin line executed — marker observed as an exact output line, merged output, kill with observed exit 143; plus typed dimension capture: guest `process\.stdout` is `isTTY:false` with fixed `columns:80`\/`rows:24` constants and no resize path\) \| blocked \(interactive stdin\/merged output\/kill proven in-browser; terminal cols\/rows are fixed constants with no resize support — the dimension\/resize sub-capability remains unproven\) \|$/m,
+    'BOLT-WC-006 must remain blocked while the browser proof records fixed dimensions and no resize path',
+  );
+});
+
 test('BOLT-WC-017 is only marked proven with the isolated and non-isolated browser-lab proof', async () => {
   const matrix = await readFile(matrixUrl, 'utf8');
   assert.match(
