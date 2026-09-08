@@ -9,6 +9,7 @@ import {
   type RuntimeFsChangeEvent,
   type RuntimeFsWatcher,
   type RuntimeProcess,
+  type RuntimeSpawnOptions,
   type RuntimeEventMap,
 } from '../../runtime-contract/dist/index.js';
 
@@ -24,7 +25,7 @@ export interface VivariLike {
     watch(path: string, listener?: (event: RuntimeFsChangeEvent) => void): RuntimeFsWatcher;
   };
   mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void>;
-  spawn(command: string, args?: string[], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess>;
+  spawn(command: string, args?: string[], options?: RuntimeSpawnOptions): Promise<RuntimeProcess>;
   attachPreview(iframe: HTMLIFrameElement): () => void | PromiseLike<void>;
   on(event: 'server-ready', listener: (port: number, url: string) => void): () => void | PromiseLike<void>;
   on(event: 'port', listener: (port: number, kind: 'open' | 'close', url: string) => void): () => void | PromiseLike<void>;
@@ -377,7 +378,7 @@ class NexariVivariRuntime implements BrowserRuntime {
     }
   }
 
-  async spawn(command: string, args: string[] = [], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess> {
+  async spawn(command: string, args: string[] = [], options?: RuntimeSpawnOptions): Promise<RuntimeProcess> {
     try {
       const instance = this.#ready();
       if (options?.signal?.aborted) throw options.signal.reason;
@@ -419,6 +420,7 @@ class NexariVivariRuntime implements BrowserRuntime {
           process.kill();
           killed = true;
         },
+        resize: (dimensions) => process.resize(dimensions),
       };
       this.#processes.add(trackedProcess);
       void trackedProcess.exit.then(

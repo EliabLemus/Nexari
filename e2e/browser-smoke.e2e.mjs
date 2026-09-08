@@ -155,13 +155,13 @@ try {
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.capabilitiesProof`),
-    'native_addons-docker-tcp_remote-udp-ssh-linux_binary-permission_changes-symlinks-interactive_terminal-text_search-unsupported-filesystem_watch-experimental',
-    'the browser lab must explicitly disclose unsupported native, permission-change, symlink and interactive-terminal capabilities while filesystem watching remains experimental',
+    'native_addons-docker-tcp_remote-udp-ssh-linux_binary-permission_changes-symlinks-text_search-unsupported-filesystem_watch-interactive_terminal-experimental',
+    'the browser lab must explicitly disclose unsupported native, permission-change and symlink capabilities while filesystem watching and the public interactive terminal remain experimental',
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.interactiveTerminalCapabilityProof`),
-    'unsupported',
-    'the browser lab must explicitly disclose that an interactive terminal is unavailable until browser support is proven',
+    'experimental',
+    'the browser lab must disclose the public interactive terminal as experimental and then prove terminal resize behavior in a browser guest',
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.stdinProof`),
@@ -177,6 +177,11 @@ try {
     await evaluate(`document.querySelector('#status')?.dataset.processOptionsProof`),
     'cwd-env-args-exit',
     'the owned Vivari process bridge must apply cwd, environment variables and arguments before the server starts',
+  );
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.terminalResizeProof`),
+    'tty:true:132x43|resize:101x29:SIGWINCH',
+    'the guest must print initial dimensions and resized dimensions from its own SIGWINCH handler',
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.npmCommandUnavailableProof`),

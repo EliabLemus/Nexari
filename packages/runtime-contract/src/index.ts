@@ -34,6 +34,22 @@ export interface RuntimeProcess {
   readonly input: WritableStream<string>;
   readonly exit: Promise<number>;
   kill(): void;
+  /** Resize the attached terminal. Only meaningful when spawned with `terminal`. */
+  resize(dimensions: RuntimeTerminalDimensions): void;
+}
+
+/** Initial or updated dimensions for an experimental interactive terminal. */
+export interface RuntimeTerminalDimensions {
+  columns: number;
+  rows: number;
+}
+
+export interface RuntimeSpawnOptions {
+  cwd?: string;
+  env?: Record<string, string>;
+  signal?: AbortSignal;
+  /** Attach an experimental interactive terminal with these initial dimensions. */
+  terminal?: RuntimeTerminalDimensions;
 }
 
 export type RuntimeEventMap = {
@@ -66,7 +82,7 @@ export interface BrowserRuntime {
   readonly fs: RuntimeFileSystem;
   boot(options?: RuntimeBootOptions): Promise<void>;
   mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void>;
-  spawn(command: string, args?: string[], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess>;
+  spawn(command: string, args?: string[], options?: RuntimeSpawnOptions): Promise<RuntimeProcess>;
   attachPreview(iframe: HTMLIFrameElement): () => void | PromiseLike<void>;
   on<E extends keyof RuntimeEventMap>(event: E, listener: (...args: RuntimeEventMap[E]) => void): () => void;
   export(path?: string): Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>;

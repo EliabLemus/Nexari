@@ -98,6 +98,41 @@ async function bootRuntime() {
     }
   }
   status.dataset.abortedBootProof = 'boot-aborted-terminated-before-fresh-runtime';
+  // Exercise the public Nexari adapter, not the fork directly. `spawn()` resolves
+  // when the kernel assigns an execId/PID mapping, before the process worker is
+  // necessarily ready, so the immediate resize also proves the pre-ready queue.
+  const terminalRuntime = createVivariRuntime({ id: crypto.randomUUID(), loadSdk: loadPinnedVivariSdk });
+  await terminalRuntime.boot({ previewOrigin: window.location.origin });
+  await terminalRuntime.mount({
+    'terminal-resize.js': { file: { contents: [
+      "process.stdout.write(`tty:${process.stdout.isTTY}:${process.stdout.columns}x${process.stdout.rows}\\n`);",
+      "process.on('SIGWINCH', () => {",
+      "  process.stdout.write(`resize:${process.stdout.columns}x${process.stdout.rows}:SIGWINCH\\n`);",
+      '  process.exit(0);',
+      '});',
+      'setInterval(() => {}, 1_000);',
+    ].join('\n') } },
+  });
+  const terminalProcess = await terminalRuntime.spawn('node', ['terminal-resize.js'], {
+    terminal: { columns: 132, rows: 43 },
+  });
+  let terminalOutput = '';
+  const terminalOutputClosed = (async () => {
+    for await (const chunk of terminalProcess.output) terminalOutput += chunk;
+  })();
+  if (!await waitFor(() => terminalOutput.includes('tty:true:132x43'))) {
+    throw new Error(`Vivari terminal initial-dimensions guest proof timed out: ${JSON.stringify(terminalOutput)}`);
+  }
+  terminalProcess.resize({ columns: 101, rows: 29 });
+  const terminalExit = await terminalProcess.exit;
+  await terminalOutputClosed;
+  await terminalRuntime.teardown();
+  if (terminalExit !== 0
+    || !terminalOutput.includes('tty:true:132x43')
+    || !terminalOutput.includes('resize:101x29:SIGWINCH')) {
+    throw new Error(`Vivari terminal resize guest proof failed: ${JSON.stringify({ terminalExit, terminalOutput })}`);
+  }
+  status.dataset.terminalResizeProof = terminalOutput.trim().replaceAll('\n', '|');
   // This lab proves independent, short-lived runtime instances. Vivari's default
   // OPFS mirror is intentionally durable, so clear only this controlled lab's
   // origin-scoped state before constructing each fresh instance.
@@ -110,14 +145,14 @@ async function bootRuntime() {
   await runtime.boot({ previewOrigin });
   status.dataset.selfHostedPreviewOriginProof = previewOrigin;
   const capabilities = runtime.getCapabilities();
-  const unsupportedCapabilityNames = ['native_addons', 'docker', 'tcp_remote', 'udp', 'ssh', 'linux_binary', 'permission_changes', 'symlinks', 'interactive_terminal', 'text_search'] as const;
+  const unsupportedCapabilityNames = ['native_addons', 'docker', 'tcp_remote', 'udp', 'ssh', 'linux_binary', 'permission_changes', 'symlinks', 'text_search'] as const;
   if (unsupportedCapabilityNames.some((name) => capabilities[name] !== 'unsupported')) {
     throw new Error('Vivari browser-runtime limitations must be explicitly unsupported');
   }
-  if (capabilities.filesystem_watch !== 'experimental') {
-    throw new Error('Vivari filesystem watching must be explicitly experimental until its browser proof passes');
+  if (capabilities.filesystem_watch !== 'experimental' || capabilities.interactive_terminal !== 'experimental') {
+    throw new Error('Vivari browser-runtime experimental capabilities must be explicitly disclosed');
   }
-  status.dataset.capabilitiesProof = `${unsupportedCapabilityNames.join('-')}-unsupported-filesystem_watch-experimental`;
+  status.dataset.capabilitiesProof = `${unsupportedCapabilityNames.join('-')}-unsupported-filesystem_watch-interactive_terminal-experimental`;
   runtime.attachPreview(preview);
   await runtime.mount(project);
   const instanceMarkerPath = 'nexari-runtime-instance-marker.txt';
@@ -253,10 +288,10 @@ async function bootRuntime() {
     throw new Error('Vivari shell compatibility changed; add a positive shell browser proof before exposing it');
   }
   status.dataset.shellCommandUnavailableProof = 'exit-127-diagnostic';
-  if (capabilities.interactive_terminal !== 'unsupported') {
-    throw new Error('Vivari interactive terminal support must remain explicitly unavailable until a browser proof exists');
+  if (capabilities.interactive_terminal !== 'experimental') {
+    throw new Error('Vivari interactive terminal support must be explicitly experimental after its public-adapter browser proof');
   }
-  status.dataset.interactiveTerminalCapabilityProof = 'unsupported';
+  status.dataset.interactiveTerminalCapabilityProof = 'experimental';
   if (runtime.workdir !== '/' || observedProcessOptions.cwd !== runtime.workdir) {
     throw new Error('Vivari stable workdir proof failed');
   }

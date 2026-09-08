@@ -25,7 +25,7 @@ export function unsupportedCapabilities(): RuntimeCapabilities {
     permission_changes: 'unsupported',
     symlinks: 'unsupported',
     filesystem_watch: 'experimental',
-    interactive_terminal: 'unsupported',
+    interactive_terminal: 'experimental',
     text_search: 'unsupported',
   };
 }

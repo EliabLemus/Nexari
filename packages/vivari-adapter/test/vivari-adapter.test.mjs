@@ -20,7 +20,20 @@ function fakeSdk() {
       },
     },
     mount: async () => { calls.mount++; },
-    spawn: async () => { calls.spawn++; return { pid: 41, output: stream, stdout: stream, stderr: stream, input: new WritableStream(), exit: Promise.resolve(0), kill() {} }; },
+    spawn: async (...spawnArgs) => {
+      calls.spawn++;
+      Object.defineProperty(calls, 'spawnArgs', { value: spawnArgs, writable: true, configurable: true });
+      return {
+        pid: 41,
+        output: stream,
+        stdout: stream,
+        stderr: stream,
+        input: new WritableStream(),
+        exit: Promise.resolve(0),
+        kill() {},
+        resize(dimensions) { Object.defineProperty(calls, 'resize', { value: dimensions, writable: true, configurable: true }); },
+      };
+    },
     on: (event, listener) => {
       calls.subscribe++;
       listeners.set(event, listener);
@@ -36,6 +49,20 @@ function fakeSdk() {
   };
   return { calls, instance, get watcher() { return watcher; }, loader: async () => ({ boot: async () => { calls.boot++; return instance; } }) };
 }
+
+test('exposes terminal spawn and resize through the public adapter process contract', async () => {
+  const fake = fakeSdk();
+  const runtime = createVivariRuntime({ id: 'terminal-public-surface', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const process = await runtime.spawn('sh', [], { terminal: { columns: 132, rows: 43 } });
+  process.resize({ columns: 101, rows: 29 });
+  assert.equal(fake.calls.spawn, 1);
+  assert.equal(fake.calls.spawnArgs[0], 'sh');
+  assert.deepEqual(fake.calls.spawnArgs[1], []);
+  assert.deepEqual(fake.calls.spawnArgs[2].terminal, { columns: 132, rows: 43 });
+  assert.deepEqual(fake.calls.resize, { columns: 101, rows: 29 });
+  await runtime.teardown();
+});
 
 test('rejects without isolation before booting the fork', async () => {
   const fake = fakeSdk();
