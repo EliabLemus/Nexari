@@ -202,3 +202,24 @@ test('rejects any manifest that promotes BOLT-WC-005/006', () => {
     /must not promote BOLT-WC-005 or BOLT-WC-006/,
   );
 });
+
+test('rejects promotion phrased as unblocked, succeeds, or works', () => {
+  const promotions = [
+    'BOLT-WC-006 unblocked by static seam',
+    'BOLT-WC-006 succeeds in this build',
+    'BOLT-WC-005 works without Chrome',
+  ];
+
+  for (const promotion of promotions) {
+    const manifest = structuredClone(VALID_MANIFEST);
+    // Keep the probe to one row: otherwise a later, unrelated `supported`
+    // status can accidentally satisfy the guard's broad 120-character scan.
+    manifest.seam = [manifest.seam[0]];
+    manifest.seam[0].note = promotion;
+    assert.throws(
+      () => validateSeamProbeReport(baseReport(), manifest),
+      /must not promote BOLT-WC-005 or BOLT-WC-006/,
+      promotion,
+    );
+  }
+});
