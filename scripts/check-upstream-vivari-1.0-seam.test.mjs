@@ -223,3 +223,20 @@ test('rejects promotion phrased as unblocked, succeeds, or works', () => {
     );
   }
 });
+
+test('rejects every residual BOLT-WC-005/006 reference outside the canonical blocked note', () => {
+  for (const note of [
+    'BOLT-WC-005 is green according to this static seam',
+    'BOLT-WC-006 is validated by candidate source inspection',
+    `BOLT-WC-005 ${'x'.repeat(121)} is proven`,
+  ]) {
+    const manifest = structuredClone(VALID_MANIFEST);
+    manifest.seam = [manifest.seam[0]];
+    manifest.seam[0].note = note;
+    assert.throws(
+      () => validateSeamProbeReport(baseReport(), manifest),
+      /must not promote BOLT-WC-005 or BOLT-WC-006/,
+      note,
+    );
+  }
+});

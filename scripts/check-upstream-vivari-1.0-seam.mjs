@@ -14,8 +14,7 @@ const LEDGER_CANDIDATE_SHA = '2629c71097238400c45aefa213ef61df4794c2b7';
 // Owned fork pin (see runtime/PATCHES.md); the submodule must not move.
 const OWNED_FORK_GITLINK = '26f1d6222942a09411292ea6e55053f3729436ca';
 
-const promotionPattern =
-  /BOLT-WC-00[56][^\n]{0,120}\b(?:proven|compatible|passes|pass|supported|unblocked|succeeds?|works?)\b|\b(?:promotes?|proves?)\s+BOLT-WC-00[56]/i;
+const blockedCapabilityPattern = /BOLT-WC-00[56]/i;
 
 // Measured 2026-09-05 (git rev-list --count, complete history): the ledger
 // candidate tag is 99 commits behind upstream master 9a89ff3, and the owned
@@ -163,10 +162,11 @@ export function validateSeamProbeReport(report, manifest) {
   if ((manifest.capabilityNote ?? '') !== CANONICAL_CAPABILITY_NOTE) {
     throw new Error('the seam manifest capabilityNote must exactly state that BOLT-WC-005 and BOLT-WC-006 remain blocked');
   }
-  // Promotion guard over everything else: no other field, note, or row may
-  // claim BOLT-WC-005/006 success — only real Chrome E2E can.
+  // The canonical note is the sole allowed occurrence of BOLT-WC-005/006 in
+  // this static seam. Any residual mention can be read as a capability claim,
+  // and only real Chrome E2E is allowed to advance either row.
   const manifestText = JSON.stringify(manifest);
-  if (promotionPattern.test(manifestText.replace(CANONICAL_CAPABILITY_NOTE, ''))) {
+  if (blockedCapabilityPattern.test(manifestText.replace(CANONICAL_CAPABILITY_NOTE, ''))) {
     throw new Error('the seam manifest must not promote BOLT-WC-005 or BOLT-WC-006; real Chrome E2E proof is required first');
   }
 
