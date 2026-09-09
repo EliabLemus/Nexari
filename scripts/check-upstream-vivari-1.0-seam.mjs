@@ -14,7 +14,8 @@ const LEDGER_CANDIDATE_SHA = '2629c71097238400c45aefa213ef61df4794c2b7';
 // Owned fork pin (see runtime/PATCHES.md); the submodule must not move.
 const OWNED_FORK_GITLINK = '26f1d6222942a09411292ea6e55053f3729436ca';
 
-const promotionPattern = /BOLT-WC-00[56][^\n]{0,120}\b(?:proven|compatible|passes|pass|supported)\b|\b(?:promotes?|proves?)\s+BOLT-WC-00[56]/i;
+const promotionPattern =
+  /BOLT-WC-00[56][^\n]{0,120}\b(?:proven|compatible|passes|pass|supported|unblocked|succeeds?|works?)\b|\b(?:promotes?|proves?)\s+BOLT-WC-00[56]/i;
 
 // Measured 2026-09-05 (git rev-list --count, complete history): the ledger
 // candidate tag is 99 commits behind upstream master 9a89ff3, and the owned
