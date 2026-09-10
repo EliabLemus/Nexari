@@ -41,7 +41,14 @@ function baseReport() {
     gitlinkSha: OWNED_SHA,
     indexGitlinkSha: OWNED_SHA,
     submoduleClean: true,
-    lineage: { candidateAncestorOfOwned: true },
+    lineage: {
+      candidateAncestorOfOwned: true,
+      distances: {
+        tagBehindMaster: 99,
+        ownedBehindTag: 101,
+        ownedAheadOfMaster: 2,
+      },
+    },
     sources: {
       'packages/core/src/vivari.ts': 'export class Vivari {\n  static async boot(options = {}) {\n  }\n}',
       'packages/core/src/process.ts': 'export class VivariProcess {\n  kill(): void {\n  }\n}',
@@ -52,6 +59,24 @@ function baseReport() {
 
 test('accepts a report whose status column matches the pinned candidate sources', () => {
   assert.doesNotThrow(() => validateSeamProbeReport(baseReport(), VALID_MANIFEST));
+});
+
+test('rejects a probe report without live measured lineage distances', () => {
+  const report = baseReport();
+  delete report.lineage.distances;
+  assert.throws(
+    () => validateSeamProbeReport(report, VALID_MANIFEST),
+    /must record measured lineage distances/,
+  );
+});
+
+test('rejects non-numeric live measured lineage distances', () => {
+  const report = baseReport();
+  report.lineage.distances.tagBehindMaster = '99';
+  assert.throws(
+    () => validateSeamProbeReport(report, VALID_MANIFEST),
+    /must record measured lineage distances/,
+  );
 });
 
 test('fails closed when the probe never resolved the candidate SHA', () => {
