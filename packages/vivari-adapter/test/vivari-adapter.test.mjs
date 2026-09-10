@@ -587,6 +587,26 @@ test('rejects a candidate-shaped process that has no honest pid source', async (
   await runtime.teardown();
 });
 
+test('rejects a candidate-shaped process that lacks separate stdout and stderr streams', async () => {
+  const fake = fakeSdk();
+  fake.instance.spawn = async () => ({
+    pid: 42,
+    output: stream,
+    input: new WritableStream(),
+    exit: Promise.resolve(0),
+    kill() {},
+  });
+  const runtime = createVivariRuntime({ id: 'candidate-process-with-merged-output-only', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  await assert.rejects(
+    runtime.spawn('node', ['app.js']),
+    (error) => error instanceof RuntimeError
+      && error.code === 'UNSUPPORTED_CAPABILITY'
+      && error.message === 'Vivari process does not expose separate stdout and stderr streams.',
+  );
+  await runtime.teardown();
+});
+
 test('rejects a relative mountPoint before it reaches the owned Vivari mount seam', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'relative-mount-point', isIsolated: () => true, loadSdk: fake.loader });

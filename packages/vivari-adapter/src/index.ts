@@ -416,6 +416,16 @@ class NexariVivariRuntime implements BrowserRuntime {
         }
         throw new RuntimeError('UNSUPPORTED_CAPABILITY', 'Vivari process does not expose a pid.');
       }
+      // The candidate provides merged output only. The host contract requires
+      // both separate streams, so reject rather than returning undefined.
+      if (!process.stdout || !process.stderr) {
+        try {
+          process.kill();
+        } catch {
+          // Preserve the capability failure; best-effort cleanup cannot create streams.
+        }
+        throw new RuntimeError('UNSUPPORTED_CAPABILITY', 'Vivari process does not expose separate stdout and stderr streams.');
+      }
       let killed = false;
       const trackedProcess: RuntimeProcess = {
         pid: process.pid,
