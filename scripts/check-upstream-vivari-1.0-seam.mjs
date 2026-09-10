@@ -62,6 +62,13 @@ export async function probeSeam() {
   } catch {
     candidateAncestorOfOwned = false;
   }
+  let ownedAncestorOfCandidate = false;
+  try {
+    await git('merge-base', '--is-ancestor', OWNED_FORK_GITLINK, LEDGER_CANDIDATE_SHA);
+    ownedAncestorOfCandidate = true;
+  } catch {
+    ownedAncestorOfCandidate = false;
+  }
 
   const [tagBehindMaster, ownedAheadOfTag, ownedAheadOfMaster] = await Promise.all([
     git('rev-list', '--count', `${LEDGER_CANDIDATE_SHA}..${UPSTREAM_MASTER_SHA}`),
@@ -76,6 +83,7 @@ export async function probeSeam() {
     submoduleClean,
     lineage: {
       candidateAncestorOfOwned,
+      ownedAncestorOfCandidate,
       distances: {
         tagBehindMaster: Number(tagBehindMaster.trim()),
         ownedAheadOfTag: Number(ownedAheadOfTag.trim()),
@@ -126,8 +134,11 @@ export function validateSeamProbeReport(report, manifest) {
   // The lineage flag must be a measured boolean, and it must agree with the
   // probe's own merge-base topology. A stale or prose-derived record fails
   // closed instead of steering the migration decision.
-  if (report.lineage?.candidateAncestorOfOwned !== true && report.lineage?.candidateAncestorOfOwned !== false) {
-    throw new Error('the seam probe must record lineage (candidateAncestorOfOwned); refusing to evaluate the manifest without measured git topology');
+  if (
+    (report.lineage?.candidateAncestorOfOwned !== true && report.lineage?.candidateAncestorOfOwned !== false) ||
+    (report.lineage?.ownedAncestorOfCandidate !== true && report.lineage?.ownedAncestorOfCandidate !== false)
+  ) {
+    throw new Error('the seam probe must record both lineage directions; refusing to evaluate the manifest without measured git topology');
   }
   const measuredDistances = report.lineage?.distances;
   if (
@@ -142,9 +153,20 @@ export function validateSeamProbeReport(report, manifest) {
   if (typeof declaredUnrelated !== 'boolean') {
     throw new Error('unrelatedHistoryToCandidate must be a boolean measured against the resolved candidate, not prose');
   }
-  if (report.lineage.candidateAncestorOfOwned === declaredUnrelated) {
+  const measuredUnrelated = !report.lineage.candidateAncestorOfOwned && !report.lineage.ownedAncestorOfCandidate;
+  if (declaredUnrelated !== measuredUnrelated) {
     throw new Error(
-      `the manifest's unrelatedHistoryToCandidate=${declaredUnrelated} contradicts the probed lineage (candidateAncestorOfOwned=${report.lineage.candidateAncestorOfOwned}); fix the record to match measured git topology`,
+      `the manifest's unrelatedHistoryToCandidate=${declaredUnrelated} contradicts the probed lineage (candidateAncestorOfOwned=${report.lineage.candidateAncestorOfOwned}, ownedAncestorOfCandidate=${report.lineage.ownedAncestorOfCandidate}); fix the record to match measured git topology`,
+    );
+  }
+  const measuredDirection = report.lineage.candidateAncestorOfOwned
+    ? 'candidate-ancestor'
+    : report.lineage.ownedAncestorOfCandidate
+      ? 'candidate-descendant'
+      : 'unrelated';
+  if (manifest.migration?.ownedFork?.lineageDirection !== measuredDirection) {
+    throw new Error(
+      `the manifest's lineageDirection=${String(manifest.migration?.ownedFork?.lineageDirection)} contradicts the probed direction ${measuredDirection}; fix the record to match measured git topology`,
     );
   }
 
@@ -159,7 +181,7 @@ export function validateSeamProbeReport(report, manifest) {
   if (bogus.length > 0) {
     throw new Error(
       `the migration record quotes commit distance(s) ${bogus.join(', ')} that contradict the measured counts ` +
-        `(tag behind master ${measuredDistances.tagBehindMaster}, owned behind tag ${measuredDistances.ownedBehindTag}, ` +
+        `(tag behind master ${measuredDistances.tagBehindMaster}, owned ahead of tag ${measuredDistances.ownedAheadOfTag}, ` +
         `owned ahead of master ${measuredDistances.ownedAheadOfMaster}); correct the prose or re-measure before recording`,
     );
   }

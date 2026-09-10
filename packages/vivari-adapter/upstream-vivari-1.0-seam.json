@@ -9,7 +9,8 @@
     },
     "ownedFork": {
       "gitlink": "26f1d6222942a09411292ea6e55053f3729436ca",
-      "unrelatedHistoryToCandidate": false
+      "unrelatedHistoryToCandidate": false,
+      "lineageDirection": "candidate-ancestor"
     },
     "lineageNote": "Measured 2026-09-05 with git merge-base --is-ancestor and git rev-list --count on complete history: v1.0.0 (2629c71, 2026-07-26) is a strict ANCESTOR of the owned fork. Upstream master 9a89ff3 (2026-08-12) descends from the tag (99 commits later), and the owned fork HEAD 26f1d62 is upstream master plus two local commits (1 file, +10/-2), i.e. 101 commits ahead of the tag. The npm-published 1.0.0 tag is therefore older than the code the owned runtime already ships; adopting it would be a downgrade, not an upgrade. An earlier unrelated-histories record here was an artifact of a stale .git/shallow boundary at 9a89ff3 in the nested clone and has been corrected with a deterministic probe guard."
     ,

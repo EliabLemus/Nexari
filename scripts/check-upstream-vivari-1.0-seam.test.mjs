@@ -8,7 +8,7 @@ const OWNED_SHA = '26f1d6222942a09411292ea6e55053f3729436ca';
 const VALID_MANIFEST = {
   migration: {
     candidate: { package: '@vivari/core', version: '1.0.0', sha: CANDIDATE_SHA },
-    ownedFork: { unrelatedHistoryToCandidate: false },
+    ownedFork: { unrelatedHistoryToCandidate: false, lineageDirection: 'candidate-ancestor' },
     lineageNote: 'v1.0.0 is a strict ancestor of the owned fork (101 commits behind).',
   },
   capabilityNote:
@@ -43,6 +43,7 @@ function baseReport() {
     submoduleClean: true,
     lineage: {
       candidateAncestorOfOwned: true,
+      ownedAncestorOfCandidate: false,
       distances: {
         tagBehindMaster: 99,
         ownedAheadOfTag: 101,
@@ -152,12 +153,21 @@ test('rejects a manifest whose unrelatedHistoryToCandidate contradicts the probe
   );
 });
 
-test('rejects a probe report that never measured lineage', () => {
+test('accepts a truthful related candidate that descends from the owned fork', () => {
   const report = baseReport();
-  delete report.lineage;
+  report.lineage.candidateAncestorOfOwned = false;
+  report.lineage.ownedAncestorOfCandidate = true;
+  const manifest = structuredClone(VALID_MANIFEST);
+  manifest.migration.ownedFork.lineageDirection = 'candidate-descendant';
+  assert.doesNotThrow(() => validateSeamProbeReport(report, manifest));
+});
+
+test('rejects a probe report that never measured both lineage directions', () => {
+  const report = baseReport();
+  delete report.lineage.ownedAncestorOfCandidate;
   assert.throws(
     () => validateSeamProbeReport(report, VALID_MANIFEST),
-    /must record lineage/,
+    /must record both lineage directions/,
   );
 });
 
