@@ -37,7 +37,7 @@ const config = await readFile(path.join(lab, 'vite.config.ts'), 'utf8');
 for (const needle of ['Cross-Origin-Opener-Policy', 'same-origin', 'Cross-Origin-Embedder-Policy', 'require-corp', 'Service-Worker-Allowed']) {
   if (!config.includes(needle)) throw new Error(`browser lab must serve ${needle}`);
 }
-for (const needle of ['serveNexariAssets', "'/assets/'", 'runtime/vivari/packages/core/dist/assets', 'fs.cpSync']) {
+for (const needle of ['serveNexariAssets', "'/assets/'", "'/vendor/'", 'runtime/vivari/packages/core/dist/assets', 'runtime/vivari/packages/studio/public/vendor', 'fs.lstatSync', 'isSymbolicLink', 'fs.cpSync']) {
   if (!config.includes(needle)) throw new Error(`browser lab must serve the pinned Vivari asset ${needle}`);
 }
 console.log('browser lab static contract: PASS');

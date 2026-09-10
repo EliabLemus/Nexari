@@ -31,6 +31,15 @@ test('BOLT-WC-004 is only marked proven with the browser-lab stable workdir proo
   );
 });
 
+test('BOLT-WC-005 remains blocked until a shell browser proof exists, while recording the real vendored npm browser proof', async () => {
+  const matrix = await readFile(matrixUrl, 'utf8');
+  assert.match(
+    matrix,
+    /^\| BOLT-WC-005 \| must-have \| spawn: Runtime spawns node, npm and shell-like guest processes with arguments, cwd\/env and observable exit\. \| app\/lib\/runtime\/action-runner\.ts:395; app\/utils\/shell\.ts:7-89 \| e2e\/browser-smoke\.e2e\.mjs \(real node and lazy-loaded vendored npm cwd\/env\/args\/exit; pinned `sh` diagnostic exit 127\) \| blocked \(node and real vendored npm proven; shell unavailable: `sh` reports `printf` not found and exits 127\) \|$/m,
+    'BOLT-WC-005 cannot leave the compatibility gate until the real browser shell behavior is independently proven, even when the vendored npm CLI is proven',
+  );
+});
+
 test('BOLT-WC-017 is only marked proven with the isolated and non-isolated browser-lab proof', async () => {
   const matrix = await readFile(matrixUrl, 'utf8');
   assert.match(

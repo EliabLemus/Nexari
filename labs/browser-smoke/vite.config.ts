@@ -12,6 +12,7 @@ const isolation = process.env.NEXARI_LAB_ISOLATION === 'off'
 
 function serveNexariAssets(): Plugin {
   const assetsDir = path.resolve(fileURLToPath(new URL('../../runtime/vivari/packages/core/dist/assets/', import.meta.url)));
+  const vendorDir = path.resolve(fileURLToPath(new URL('../../runtime/vivari/packages/studio/public/vendor/', import.meta.url)));
   const swPath = fileURLToPath(new URL('../../runtime/vivari/packages/core/dist/assets/sw.js', import.meta.url));
   if (!fs.existsSync(swPath)) throw new Error('Vivari SDK dist is missing; run npm run build:vivari from the Nexari root.');
   const middleware = (req: { url?: string }, res: any, next: () => void) => {
@@ -31,6 +32,17 @@ function serveNexariAssets(): Plugin {
         return;
       }
     }
+    if (pathname.startsWith('/vendor/')) {
+      const candidate = path.resolve(vendorDir, pathname.slice('/vendor/'.length));
+      if (candidate.startsWith(`${vendorDir}${path.sep}`) && fs.existsSync(candidate)) {
+        const entry = fs.lstatSync(candidate);
+        if (!entry.isSymbolicLink() && entry.isFile()) {
+          res.setHeader('Content-Type', 'application/octet-stream');
+          res.end(fs.readFileSync(candidate));
+          return;
+        }
+      }
+    }
     next();
   };
   return {
@@ -41,6 +53,7 @@ function serveNexariAssets(): Plugin {
       const outDir = fileURLToPath(new URL('./dist/', import.meta.url));
       fs.copyFileSync(swPath, `${outDir}sw.js`);
       fs.cpSync(assetsDir, `${outDir}assets`, { recursive: true });
+      fs.cpSync(vendorDir, `${outDir}vendor`, { recursive: true });
     },
   };
 }
