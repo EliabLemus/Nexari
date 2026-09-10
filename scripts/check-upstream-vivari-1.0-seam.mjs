@@ -16,16 +16,7 @@ const OWNED_FORK_GITLINK = '26f1d6222942a09411292ea6e55053f3729436ca';
 
 const blockedCapabilityPattern = /BOLT-WC-00[56]/i;
 
-// Measured 2026-09-05 (git rev-list --count, complete history): the ledger
-// candidate tag is 99 commits behind upstream master 9a89ff3, and the owned
-// fork 26f1d62 is upstream master plus 2 local commits (101 behind the tag).
-// Prose in the manifest may quote commit distances only when they match these
-// measured counts; anything else fails closed like every other lineage claim.
-const MEASURED_COMMIT_DISTANCES = {
-  tagBehindMaster: 99,
-  ownedBehindTag: 101,
-  ownedAheadOfMaster: 2,
-};
+const UPSTREAM_MASTER_SHA = '9a89ff328b87ad0fb6a180d4401ea418c180cbe7';
 
 async function git(...args) {
   const { stdout } = await execFileAsync('git', ['-C', runtimeDir, ...args], { encoding: 'utf8' });
@@ -72,12 +63,25 @@ export async function probeSeam() {
     candidateAncestorOfOwned = false;
   }
 
+  const [tagBehindMaster, ownedBehindTag, ownedAheadOfMaster] = await Promise.all([
+    git('rev-list', '--count', `${LEDGER_CANDIDATE_SHA}..${UPSTREAM_MASTER_SHA}`),
+    git('rev-list', '--count', `${LEDGER_CANDIDATE_SHA}..${OWNED_FORK_GITLINK}`),
+    git('rev-list', '--count', `${UPSTREAM_MASTER_SHA}..${OWNED_FORK_GITLINK}`),
+  ]);
+
   return {
     candidateSha,
     gitlinkSha,
     indexGitlinkSha,
     submoduleClean,
-    lineage: { candidateAncestorOfOwned },
+    lineage: {
+      candidateAncestorOfOwned,
+      distances: {
+        tagBehindMaster: Number(tagBehindMaster.trim()),
+        ownedBehindTag: Number(ownedBehindTag.trim()),
+        ownedAheadOfMaster: Number(ownedAheadOfMaster.trim()),
+      },
+    },
     sources: {},
   };
 }
@@ -125,6 +129,15 @@ export function validateSeamProbeReport(report, manifest) {
   if (report.lineage?.candidateAncestorOfOwned !== true && report.lineage?.candidateAncestorOfOwned !== false) {
     throw new Error('the seam probe must record lineage (candidateAncestorOfOwned); refusing to evaluate the manifest without measured git topology');
   }
+  const measuredDistances = report.lineage?.distances;
+  if (
+    !measuredDistances ||
+    !['tagBehindMaster', 'ownedBehindTag', 'ownedAheadOfMaster'].every(
+      (key) => Number.isSafeInteger(measuredDistances[key]) && measuredDistances[key] >= 0,
+    )
+  ) {
+    throw new Error('the seam probe must record measured lineage distances; refusing to validate migration prose against constants');
+  }
   const declaredUnrelated = manifest.migration?.ownedFork?.unrelatedHistoryToCandidate;
   if (typeof declaredUnrelated !== 'boolean') {
     throw new Error('unrelatedHistoryToCandidate must be a boolean measured against the resolved candidate, not prose');
@@ -136,18 +149,18 @@ export function validateSeamProbeReport(report, manifest) {
   }
 
   // Prose lineage records caused the original shallow-artifact confusion, so a
-  // quoted "N commits" distance must agree with the measured counts or the
-  // record is rejected outright.
+  // quoted "N commits" distance must agree with the live probe or the record
+  // is rejected outright.
   const quotedDistances = [
     ...JSON.stringify(manifest.migration ?? {}).matchAll(/(\d+)\s+commits?/g),
   ].map((match) => Number(match[1]));
-  const allowed = new Set(Object.values(MEASURED_COMMIT_DISTANCES));
+  const allowed = new Set(Object.values(measuredDistances));
   const bogus = quotedDistances.filter((count) => !allowed.has(count));
   if (bogus.length > 0) {
     throw new Error(
       `the migration record quotes commit distance(s) ${bogus.join(', ')} that contradict the measured counts ` +
-        `(tag behind master ${MEASURED_COMMIT_DISTANCES.tagBehindMaster}, owned behind tag ${MEASURED_COMMIT_DISTANCES.ownedBehindTag}, ` +
-        `owned ahead of master ${MEASURED_COMMIT_DISTANCES.ownedAheadOfMaster}); correct the prose or re-measure before recording`,
+        `(tag behind master ${measuredDistances.tagBehindMaster}, owned behind tag ${measuredDistances.ownedBehindTag}, ` +
+        `owned ahead of master ${measuredDistances.ownedAheadOfMaster}); correct the prose or re-measure before recording`,
     );
   }
 
