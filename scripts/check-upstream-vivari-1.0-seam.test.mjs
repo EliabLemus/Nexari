@@ -45,7 +45,7 @@ function baseReport() {
       candidateAncestorOfOwned: true,
       distances: {
         tagBehindMaster: 99,
-        ownedBehindTag: 101,
+        ownedAheadOfTag: 101,
         ownedAheadOfMaster: 2,
       },
     },
@@ -64,6 +64,16 @@ test('accepts a report whose status column matches the pinned candidate sources'
 test('rejects a probe report without live measured lineage distances', () => {
   const report = baseReport();
   delete report.lineage.distances;
+  assert.throws(
+    () => validateSeamProbeReport(report, VALID_MANIFEST),
+    /must record measured lineage distances/,
+  );
+});
+
+test('requires the directionally correct owned-ahead-of-tag distance label', () => {
+  const report = baseReport();
+  report.lineage.distances.ownedBehindTag = report.lineage.distances.ownedAheadOfTag;
+  delete report.lineage.distances.ownedAheadOfTag;
   assert.throws(
     () => validateSeamProbeReport(report, VALID_MANIFEST),
     /must record measured lineage distances/,

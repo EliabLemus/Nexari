@@ -63,7 +63,7 @@ export async function probeSeam() {
     candidateAncestorOfOwned = false;
   }
 
-  const [tagBehindMaster, ownedBehindTag, ownedAheadOfMaster] = await Promise.all([
+  const [tagBehindMaster, ownedAheadOfTag, ownedAheadOfMaster] = await Promise.all([
     git('rev-list', '--count', `${LEDGER_CANDIDATE_SHA}..${UPSTREAM_MASTER_SHA}`),
     git('rev-list', '--count', `${LEDGER_CANDIDATE_SHA}..${OWNED_FORK_GITLINK}`),
     git('rev-list', '--count', `${UPSTREAM_MASTER_SHA}..${OWNED_FORK_GITLINK}`),
@@ -78,7 +78,7 @@ export async function probeSeam() {
       candidateAncestorOfOwned,
       distances: {
         tagBehindMaster: Number(tagBehindMaster.trim()),
-        ownedBehindTag: Number(ownedBehindTag.trim()),
+        ownedAheadOfTag: Number(ownedAheadOfTag.trim()),
         ownedAheadOfMaster: Number(ownedAheadOfMaster.trim()),
       },
     },
@@ -132,7 +132,7 @@ export function validateSeamProbeReport(report, manifest) {
   const measuredDistances = report.lineage?.distances;
   if (
     !measuredDistances ||
-    !['tagBehindMaster', 'ownedBehindTag', 'ownedAheadOfMaster'].every(
+    !['tagBehindMaster', 'ownedAheadOfTag', 'ownedAheadOfMaster'].every(
       (key) => Number.isSafeInteger(measuredDistances[key]) && measuredDistances[key] >= 0,
     )
   ) {
