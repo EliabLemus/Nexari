@@ -169,6 +169,16 @@ export function validateSeamProbeReport(report, manifest) {
       `the manifest's lineageDirection=${String(manifest.migration?.ownedFork?.lineageDirection)} contradicts the probed direction ${measuredDirection}; fix the record to match measured git topology`,
     );
   }
+  const expectedDisposition = {
+    'candidate-ancestor': 'downgrade',
+    'candidate-descendant': 'upgrade',
+    unrelated: 'migration',
+  }[measuredDirection];
+  if (manifest.migration?.adoptionDisposition !== expectedDisposition) {
+    throw new Error(
+      `the manifest's adoptionDisposition=${String(manifest.migration?.adoptionDisposition)} contradicts the probed ${measuredDirection} direction; expected ${expectedDisposition}`,
+    );
+  }
 
   // Prose lineage records caused the original shallow-artifact confusion, so a
   // quoted "N commits" distance must agree with the live probe or the record

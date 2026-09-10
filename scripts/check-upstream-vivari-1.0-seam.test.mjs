@@ -8,6 +8,7 @@ const OWNED_SHA = '26f1d6222942a09411292ea6e55053f3729436ca';
 const VALID_MANIFEST = {
   migration: {
     candidate: { package: '@vivari/core', version: '1.0.0', sha: CANDIDATE_SHA },
+    adoptionDisposition: 'downgrade',
     ownedFork: { unrelatedHistoryToCandidate: false, lineageDirection: 'candidate-ancestor' },
     lineageNote: 'v1.0.0 is a strict ancestor of the owned fork (101 commits behind).',
   },
@@ -159,7 +160,17 @@ test('accepts a truthful related candidate that descends from the owned fork', (
   report.lineage.ownedAncestorOfCandidate = true;
   const manifest = structuredClone(VALID_MANIFEST);
   manifest.migration.ownedFork.lineageDirection = 'candidate-descendant';
+  manifest.migration.adoptionDisposition = 'upgrade';
   assert.doesNotThrow(() => validateSeamProbeReport(report, manifest));
+});
+
+test('rejects a migration disposition that contradicts the measured lineage direction', () => {
+  const manifest = structuredClone(VALID_MANIFEST);
+  manifest.migration.adoptionDisposition = 'upgrade';
+  assert.throws(
+    () => validateSeamProbeReport(baseReport(), manifest),
+    /adoptionDisposition=upgrade contradicts the probed candidate-ancestor direction/,
+  );
 });
 
 test('rejects a probe report that never measured both lineage directions', () => {
