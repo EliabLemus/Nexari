@@ -568,6 +568,25 @@ test('maps the owned fork and detaches previews on idempotent teardown', async (
   await assert.rejects(runtime.spawn('node'), (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
 });
 
+test('rejects a candidate-shaped process that has no honest pid source', async () => {
+  const fake = fakeSdk();
+  fake.instance.spawn = async () => ({
+    output: stream,
+    input: new WritableStream(),
+    exit: Promise.resolve(0),
+    kill() {},
+  });
+  const runtime = createVivariRuntime({ id: 'candidate-process-without-pid', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  await assert.rejects(
+    runtime.spawn('node', ['app.js']),
+    (error) => error instanceof RuntimeError
+      && error.code === 'UNSUPPORTED_CAPABILITY'
+      && error.message === 'Vivari process does not expose a pid.',
+  );
+  await runtime.teardown();
+});
+
 test('rejects a relative mountPoint before it reaches the owned Vivari mount seam', async () => {
   const fake = fakeSdk();
   const runtime = createVivariRuntime({ id: 'relative-mount-point', isIsolated: () => true, loadSdk: fake.loader });

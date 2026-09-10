@@ -406,6 +406,16 @@ class NexariVivariRuntime implements BrowserRuntime {
         }
         throw controller.signal.reason;
       }
+      // The evaluated 1.0.0 candidate has no pid field. Do not fabricate one:
+      // reject its process shape until an adopted runtime supplies an honest ID.
+      if (!Number.isSafeInteger(process.pid) || process.pid < 0) {
+        try {
+          process.kill();
+        } catch {
+          // Preserve the capability failure; best-effort cleanup cannot make a pid appear.
+        }
+        throw new RuntimeError('UNSUPPORTED_CAPABILITY', 'Vivari process does not expose a pid.');
+      }
       let killed = false;
       const trackedProcess: RuntimeProcess = {
         pid: process.pid,
