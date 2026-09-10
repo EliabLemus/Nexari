@@ -39,3 +39,17 @@ test('BOLT-WC-017 is only marked proven with the isolated and non-isolated brows
     'BOLT-WC-017 needs the real browser-lab negative proof before it can leave the compatibility gate as unknown',
   );
 });
+
+test('BOLT-WC-005 and BOLT-WC-006 remain blocked until their complete Chrome E2E contracts exist', async () => {
+  const matrix = await readFile(matrixUrl, 'utf8');
+  assert.match(
+    matrix,
+    /^\| BOLT-WC-005 \| must-have \| spawn: Runtime spawns node, npm and shell-like guest processes with arguments, cwd\/env and observable exit\. \| app\/lib\/runtime\/action-runner\.ts:395; app\/utils\/shell\.ts:7-89 \| e2e\/browser-smoke\.e2e\.mjs \(real node cwd\/env\/args\/exit; npm command-not-found typed failure; pinned `sh` diagnostic exit 127\) \| blocked \(node proven; npm unavailable; shell unavailable: `sh` reports `printf` not found and exits 127\) \|$/m,
+    'BOLT-WC-005 cannot leave blocked without guest npm args/cwd/env/output/exit Chrome evidence',
+  );
+  assert.match(
+    matrix,
+    /^\| BOLT-WC-006 \| must-have \| terminal: Interactive shell process exposes input, merged output, terminal cols\/rows, resize and kill\. \| app\/utils\/shell\.ts:11-87; app\/lib\/stores\/terminal\.ts:50-61 \| e2e\/browser-smoke\.e2e\.mjs \(actual shell diagnostic plus explicit `interactive_terminal: unsupported` capability\) \| blocked \(explicitly unavailable; no interactive shell, terminal dimensions, or resize support is claimed\) \|$/m,
+    'BOLT-WC-006 cannot leave blocked without interactive stdin/output/resize/kill/exit Chrome evidence',
+  );
+});
