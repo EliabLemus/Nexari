@@ -26,6 +26,14 @@ const project = {
   'process-options.js': { file: { contents: [
     "process.stdout.write(JSON.stringify({ cwd: process.cwd(), option: process.env.NEXARI_PROCESS_OPTION, args: process.argv.slice(2) }));",
   ].join('\n') } },
+  'package.json': { file: { contents: JSON.stringify({
+    name: 'nexari-browser-smoke-fixture',
+    private: true,
+    scripts: { 'nexari-spawn-proof': 'node npm-spawn-proof.js' },
+  }) } },
+  'npm-spawn-proof.js': { file: { contents: [
+    "process.stdout.write(`NEXARI_NPM_PROOF=${JSON.stringify({ cwd: process.cwd(), option: process.env.NEXARI_NPM_OPTION, args: process.argv.slice(2) })}\\n`);",
+  ].join('\n') } },
 };
 
 async function bootRuntime() {
@@ -235,15 +243,30 @@ async function bootRuntime() {
     throw new Error('Vivari process cwd, environment or argument proof failed');
   }
   status.dataset.processOptionsProof = 'cwd-env-args-exit';
-  try {
-    await runtime.spawn('npm', ['run', 'nexari-spawn-proof']);
-    throw new Error('Vivari unexpectedly exposed npm without browser compatibility evidence');
-  } catch (error) {
-    if (!(error instanceof Error) || (error as { code?: unknown }).code !== 'COMMAND_NOT_FOUND') {
-      throw error;
-    }
+  const npmOptionsCwd = runtime.workdir;
+  const npmOptionsToken = 'nexari-npm-option';
+  const npmOptionsArgument = 'nexari-npm-argument';
+  const npmProcess = await runtime.spawn('npm', ['run', 'nexari-spawn-proof', '--', npmOptionsArgument], {
+    cwd: npmOptionsCwd,
+    env: { NEXARI_NPM_OPTION: npmOptionsToken },
+  });
+  let npmOutput = '';
+  for await (const chunk of npmProcess.output) npmOutput += chunk;
+  const npmExitCode = await npmProcess.exit;
+  const npmProof = npmOutput.match(/NEXARI_NPM_PROOF=(\{[^\n]+\})/)?.[1];
+  if (!npmProof) {
+    throw new Error(`Vivari real npm proof did not emit its guest marker: ${npmOutput}`);
   }
-  status.dataset.npmCommandUnavailableProof = 'command-not-found';
+  const observedNpmOptions = JSON.parse(npmProof);
+  if (npmExitCode !== 0
+    || observedNpmOptions.cwd !== npmOptionsCwd
+    || observedNpmOptions.option !== npmOptionsToken
+    || !observedNpmOptions.args.includes(npmOptionsArgument)) {
+    throw new Error('Vivari real npm cwd, environment, argument or exit proof failed');
+  }
+  status.dataset.npmSpawnProof = 'real-npm-run-cwd-env-args-exit';
+  status.dataset.npmExitProof = 'zero';
+  write(npmOutput);
   const shellToken = 'nexari-shell-process';
   const shellProcess = await runtime.spawn('sh', ['-c', `printf ${shellToken}`]);
   let shellOutput = '';

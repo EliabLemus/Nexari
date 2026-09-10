@@ -179,9 +179,19 @@ try {
     'the owned Vivari process bridge must apply cwd, environment variables and arguments before the server starts',
   );
   assert.equal(
-    await evaluate(`document.querySelector('#status')?.dataset.npmCommandUnavailableProof`),
-    'command-not-found',
-    'the owned Vivari process bridge must surface unavailable npm as an explicit typed error rather than silently degrading',
+    await evaluate(`document.querySelector('#status')?.dataset.npmSpawnProof`),
+    'real-npm-run-cwd-env-args-exit',
+    'the owned Vivari process bridge must lazy-load and execute the real vendored npm CLI with guest cwd, environment and arguments observable before the server starts',
+  );
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.npmExitProof`),
+    'zero',
+    'the real vendored npm CLI must complete its inert local package script successfully',
+  );
+  assert.match(
+    await evaluate(`document.querySelector('#output')?.textContent`),
+    /NEXARI_NPM_PROOF=\{"cwd":"\/","option":"nexari-npm-option","args":\["nexari-npm-argument"\]\}/,
+    'the browser DOM must retain falsifiable real npm guest output rather than a host-side imitation',
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.shellCommandUnavailableProof`),
