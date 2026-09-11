@@ -8,7 +8,12 @@ const OWNED_SHA = '26f1d6222942a09411292ea6e55053f3729436ca';
 
 const VALID_MANIFEST = {
   migration: {
-    candidate: { package: '@vivari/core', version: '1.0.0', sha: CANDIDATE_SHA },
+    candidate: {
+      package: '@vivari/core',
+      version: '1.0.0',
+      sha: CANDIDATE_SHA,
+      source: 'https://github.com/maitrungduc1410/vivari.git',
+    },
     adoptionDisposition: 'downgrade',
     adoptionBoundary: 'evaluated-not-adopted',
     ownedFork: { unrelatedHistoryToCandidate: false, lineageDirection: 'candidate-ancestor' },
@@ -118,6 +123,19 @@ test('fails closed when the manifest candidate SHA drifts from the pinned ledger
     () => validateSeamProbeReport(baseReport(), manifest),
     /does not match the ledger-recorded/,
   );
+});
+
+test('fails closed when the manifest candidate source is absent or repointed from the public ledger URL', () => {
+  for (const source of [undefined, 'https://github.com/evil-mirror/vivari.git']) {
+    const manifest = structuredClone(VALID_MANIFEST);
+    if (source === undefined) delete manifest.migration.candidate.source;
+    else manifest.migration.candidate.source = source;
+    assert.throws(
+      () => validateSeamProbeReport(baseReport(), manifest),
+      /source must exactly match the ledger-recorded upstream URL/,
+      String(source),
+    );
+  }
 });
 
 test('fails closed when the submodule carries uncommitted state', () => {

@@ -11,6 +11,7 @@ const runtimeDir = path.join(root, 'runtime', 'vivari');
 
 // Ledger-recorded candidate (@vivari/core@1.0.0, THIRD_PARTY_NOTICES.md).
 const LEDGER_CANDIDATE_SHA = '2629c71097238400c45aefa213ef61df4794c2b7';
+const LEDGER_CANDIDATE_SOURCE = 'https://github.com/maitrungduc1410/vivari.git';
 // Owned fork pin (see runtime/PATCHES.md); the submodule must not move.
 const OWNED_FORK_GITLINK = '26f1d6222942a09411292ea6e55053f3729436ca';
 
@@ -115,6 +116,11 @@ export function validateSeamProbeReport(report, manifest) {
   if (report.candidateSha !== LEDGER_CANDIDATE_SHA || manifest.migration.candidate.sha !== LEDGER_CANDIDATE_SHA) {
     throw new Error(
       `the resolved tag ${report.candidateSha} does not match the ledger-recorded candidate ${LEDGER_CANDIDATE_SHA}; the v1.0.0 ref must never be trusted for content`,
+    );
+  }
+  if (manifest.migration.candidate.source !== LEDGER_CANDIDATE_SOURCE) {
+    throw new Error(
+      `the manifest candidate source must exactly match the ledger-recorded upstream URL ${LEDGER_CANDIDATE_SOURCE}`,
     );
   }
   if (report.gitlinkSha !== OWNED_FORK_GITLINK) {
