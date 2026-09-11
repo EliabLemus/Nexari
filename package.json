@@ -9,6 +9,7 @@
     "check:openspec": "node scripts/check-openspec-layout.mjs",
     "check:bolt-inventory": "node scripts/check-bolt-inventory.mjs",
     "check:stackblitz-ledger": "node scripts/check-stackblitz-source-ledger.mjs",
+    "check:upstream-vivari-1.0-ancestry": "node scripts/check-upstream-vivari-1.0-ancestry.mjs",
     "check:bolt-issues": "node scripts/check-bolt-issue-triage.mjs",
     "check:scope": "node scripts/check-scope.mjs",
     "check:vivari-build-runner": "node scripts/check-vivari-build-runner.mjs",
@@ -23,8 +24,8 @@
     "test:vivari-adapter": "tsc -p packages/runtime-contract/tsconfig.json && tsc -p packages/vivari-adapter/tsconfig.json && node --test packages/vivari-adapter/test/vivari-adapter.test.mjs packages/vivari-adapter/test/vivari-sdk-linkage.test.mjs",
     "typecheck:runtime-contract": "tsc -p packages/runtime-contract/tsconfig.json --noEmit",
     "typecheck:vivari-adapter": "tsc -p packages/vivari-adapter/tsconfig.json --noEmit",
-    "test": "npm run test:release-version && npm run test:workflow-safety && node --test scripts/check-compatibility-evidence.test.mjs e2e/browser-smoke-cleanup.test.mjs && npm run check:workflow-safety && npm run test:runtime-contract && npm run test:vivari-adapter && npm run check:openspec && npm run check:bolt-inventory && npm run check:stackblitz-ledger && npm run check:bolt-issues && npm run check:scope && npm run check:vivari-build-runner && npm run check:browser-lab",
-    "typecheck": "npm run typecheck:runtime-contract && npm run typecheck:vivari-adapter && node --check e2e/browser-smoke.e2e.mjs && node --check e2e/browser-smoke-cleanup.mjs && node --check e2e/browser-smoke-cleanup.test.mjs && node --check scripts/generate-compatibility-research.mjs && node --check scripts/check-openspec-layout.mjs && node --check scripts/check-bolt-inventory.mjs && node --check scripts/check-stackblitz-source-ledger.mjs && node --check scripts/check-bolt-issue-triage.mjs && node --check scripts/check-scope.mjs && node --check scripts/check-vivari-build-runner.mjs && node --check scripts/check-browser-lab.mjs && node --check scripts/check-release-version.mjs && node --check scripts/check-workflow-safety.mjs && node --check scripts/build-vivari.mjs",
+    "test": "npm run test:release-version && npm run test:workflow-safety && node --test scripts/check-compatibility-evidence.test.mjs scripts/check-upstream-vivari-1.0-ancestry.test.mjs e2e/browser-smoke-cleanup.test.mjs && npm run check:workflow-safety && npm run test:runtime-contract && npm run test:vivari-adapter && npm run check:openspec && npm run check:bolt-inventory && npm run check:stackblitz-ledger && npm run check:upstream-vivari-1.0-ancestry && npm run check:bolt-issues && npm run check:scope && npm run check:vivari-build-runner && npm run check:browser-lab",
+    "typecheck": "npm run typecheck:runtime-contract && npm run typecheck:vivari-adapter && node --check e2e/browser-smoke.e2e.mjs && node --check e2e/browser-smoke-cleanup.mjs && node --check e2e/browser-smoke-cleanup.test.mjs && node --check scripts/generate-compatibility-research.mjs && node --check scripts/check-openspec-layout.mjs && node --check scripts/check-bolt-inventory.mjs && node --check scripts/check-stackblitz-source-ledger.mjs && node --check scripts/check-upstream-vivari-1.0-ancestry.mjs && node --check scripts/check-bolt-issue-triage.mjs && node --check scripts/check-scope.mjs && node --check scripts/check-vivari-build-runner.mjs && node --check scripts/check-browser-lab.mjs && node --check scripts/check-release-version.mjs && node --check scripts/check-workflow-safety.mjs && node --check scripts/build-vivari.mjs",
     "build": "npm run typecheck && npm test"
   },
   "engines": {
