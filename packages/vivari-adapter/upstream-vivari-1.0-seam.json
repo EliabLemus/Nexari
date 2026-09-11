@@ -112,8 +112,8 @@
     },
     {
       "member": "process.output (merged stdio)",
-      "status": "supported",
-      "note": "Candidate merges stdout+stderr into one ReadableStream<string>, matching the adapter's merged-output handling.",
+      "status": "shape-divergent",
+      "note": "Candidate exposes merged output, but the host process contract requires separate stdout/stderr streams; the adapter rejects this candidate shape rather than fabricate streams.",
       "evidence": [{ "path": "packages/core/src/process.ts", "contains": "readonly output: ReadableStream<string>" }]
     },
     {

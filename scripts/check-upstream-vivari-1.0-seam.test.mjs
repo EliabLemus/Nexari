@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { validateSeamProbeReport } from './check-upstream-vivari-1.0-seam.mjs';
 
@@ -105,6 +106,15 @@ test('fails closed when the resolved tag does not match the ledger-recorded SHA'
   report.candidateSha = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
   assert.throws(
     () => validateSeamProbeReport(report, VALID_MANIFEST),
+    /does not match the ledger-recorded/,
+  );
+});
+
+test('fails closed when the manifest candidate SHA drifts from the pinned ledger SHA', () => {
+  const manifest = structuredClone(VALID_MANIFEST);
+  manifest.migration.candidate.sha = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+  assert.throws(
+    () => validateSeamProbeReport(baseReport(), manifest),
     /does not match the ledger-recorded/,
   );
 });
@@ -295,4 +305,14 @@ test('rejects every residual BOLT-WC-005/006 reference outside the canonical blo
       note,
     );
   }
+});
+
+test('classifies the candidate merged process output as shape-divergent from the host process contract', async () => {
+  const manifest = JSON.parse(await readFile(
+    new URL('../packages/vivari-adapter/upstream-vivari-1.0-seam.json', import.meta.url),
+    'utf8',
+  ));
+  const output = manifest.seam.find((row) => row.member === 'process.output (merged stdio)');
+  assert.equal(output?.status, 'shape-divergent');
+  assert.match(output?.note ?? '', /separate stdout\/stderr/i);
 });
