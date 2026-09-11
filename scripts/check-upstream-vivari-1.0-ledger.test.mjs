@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { validateUpstreamVivari100Ledger } from './check-upstream-vivari-1.0-ledger.mjs';
+import { validatePinnedCandidate, validateUpstreamVivari100Ledger } from './check-upstream-vivari-1.0-ledger.mjs';
 
 const validLedger = `
 ### Evaluated, not adopted: \`@vivari/core@1.0.0\`
@@ -34,4 +34,22 @@ test('rejects a compatibility promotion even when the required disclaimer remain
     () => validateUpstreamVivari100Ledger(`${validLedger}\nBOLT-WC-005 is compatible with the candidate runtime.`),
     /unproven BOLT-WC capability promotion/,
   );
+});
+
+test('reads the candidate license by the resolved pinned SHA, never through the mutable tag again', async () => {
+  const calls = [];
+  await validatePinnedCandidate(async (...args) => {
+    calls.push(args);
+    if (args.join(' ') === 'rev-parse v1.0.0^{commit}') {
+      return '2629c71097238400c45aefa213ef61df4794c2b7\n';
+    }
+    if (args.join(' ') === 'show 2629c71097238400c45aefa213ef61df4794c2b7:LICENSE') {
+      return 'MIT License\n';
+    }
+    throw new Error(`unexpected git invocation: ${args.join(' ')}`);
+  }, '267f7a2e19dfa9df99af774520985a0e521925293ea5b7e767ab06969d06bf91');
+  assert.deepEqual(calls, [
+    ['rev-parse', 'v1.0.0^{commit}'],
+    ['show', '2629c71097238400c45aefa213ef61df4794c2b7:LICENSE'],
+  ]);
 });

@@ -31,12 +31,14 @@ async function git(...args) {
   return stdout;
 }
 
-async function validatePinnedCandidate() {
-  const commit = (await git('rev-parse', 'v1.0.0^{commit}')).trim();
+export async function validatePinnedCandidate(gitCommand = git, expectedLicenseSha256 = '30a6c0cfc55b5c36932f8438db7925460283f72c75b5f7d32efbeaadb9b75d73') {
+  const commit = (await gitCommand('rev-parse', 'v1.0.0^{commit}')).trim();
   if (commit !== '2629c71097238400c45aefa213ef61df4794c2b7') throw new Error(`Vivari v1.0.0 resolves to unexpected commit ${commit}`);
-  const license = await git('show', 'v1.0.0:LICENSE');
+  // Resolve the tag once, then address the exact object. Reusing v1.0.0 here
+  // would leave a tag-move window between provenance resolution and license read.
+  const license = await gitCommand('show', `${commit}:LICENSE`);
   const licenseSha256 = createHash('sha256').update(license).digest('hex');
-  if (licenseSha256 !== '30a6c0cfc55b5c36932f8438db7925460283f72c75b5f7d32efbeaadb9b75d73') throw new Error(`Vivari v1.0.0 LICENSE has unexpected SHA-256 ${licenseSha256}`);
+  if (licenseSha256 !== expectedLicenseSha256) throw new Error(`Vivari v1.0.0 LICENSE has unexpected SHA-256 ${licenseSha256}`);
 }
 
 if (import.meta.url === new URL(process.argv[1], 'file:').href) {
