@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { UPSTREAM_VIVARI_100_CANDIDATE } from './check-upstream-vivari-1.0-ledger.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -10,8 +11,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const runtimeDir = path.join(root, 'runtime', 'vivari');
 
 // Ledger-recorded candidate (@vivari/core@1.0.0, THIRD_PARTY_NOTICES.md).
-const LEDGER_CANDIDATE_SHA = '2629c71097238400c45aefa213ef61df4794c2b7';
-const LEDGER_CANDIDATE_SOURCE = 'https://github.com/maitrungduc1410/vivari.git';
+const LEDGER_CANDIDATE_SHA = UPSTREAM_VIVARI_100_CANDIDATE.sha;
+const LEDGER_CANDIDATE_SOURCE = UPSTREAM_VIVARI_100_CANDIDATE.source;
 // Owned fork pin (see runtime/PATCHES.md); the submodule must not move.
 const OWNED_FORK_GITLINK = '26f1d6222942a09411292ea6e55053f3729436ca';
 
@@ -122,6 +123,11 @@ export function validateSeamProbeReport(report, manifest) {
     throw new Error(
       `the manifest candidate source must exactly match the ledger-recorded upstream URL ${LEDGER_CANDIDATE_SOURCE}`,
     );
+  }
+  for (const field of ['package', 'version', 'gitRef', 'retrievedAt', 'licenseSha256']) {
+    if (manifest.migration.candidate[field] !== UPSTREAM_VIVARI_100_CANDIDATE[field]) {
+      throw new Error(`the manifest candidate ${field} must exactly match the ledger-recorded value`);
+    }
   }
   if (report.gitlinkSha !== OWNED_FORK_GITLINK) {
     throw new Error(

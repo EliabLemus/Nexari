@@ -5,14 +5,26 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+// This is the canonical metadata for the evaluated (never adopted) source
+// ledger record. Other migration guards must import it rather than repeat it.
+export const UPSTREAM_VIVARI_100_CANDIDATE = Object.freeze({
+  package: '@vivari/core',
+  version: '1.0.0',
+  sha: '2629c71097238400c45aefa213ef61df4794c2b7',
+  source: 'https://github.com/maitrungduc1410/vivari.git',
+  gitRef: 'refs/tags/v1.0.0',
+  retrievedAt: '2026-09-04T19:20:19Z',
+  licenseSha256: '30a6c0cfc55b5c36932f8438db7925460283f72c75b5f7d32efbeaadb9b75d73',
+});
+
 const requiredNeedles = [
-  '### Evaluated, not adopted: `@vivari/core@1.0.0`',
-  'Public source: https://github.com/maitrungduc1410/vivari.git',
-  'Published package metadata: https://registry.npmjs.org/@vivari/core/1.0.0',
-  'Package version / gitHead: 1.0.0 / 2629c71097238400c45aefa213ef61df4794c2b7',
-  'Git reference retrieved: refs/tags/v1.0.0',
-  'Retrieved at: 2026-09-04T19:20:19Z',
-  'License: MIT (tagged LICENSE SHA-256: 30a6c0cfc55b5c36932f8438db7925460283f72c75b5f7d32efbeaadb9b75d73)',
+  `### Evaluated, not adopted: \`${UPSTREAM_VIVARI_100_CANDIDATE.package}@${UPSTREAM_VIVARI_100_CANDIDATE.version}\``,
+  `Public source: ${UPSTREAM_VIVARI_100_CANDIDATE.source}`,
+  `Published package metadata: https://registry.npmjs.org/${UPSTREAM_VIVARI_100_CANDIDATE.package}/${UPSTREAM_VIVARI_100_CANDIDATE.version}`,
+  `Package version / gitHead: ${UPSTREAM_VIVARI_100_CANDIDATE.version} / ${UPSTREAM_VIVARI_100_CANDIDATE.sha}`,
+  `Git reference retrieved: ${UPSTREAM_VIVARI_100_CANDIDATE.gitRef}`,
+  `Retrieved at: ${UPSTREAM_VIVARI_100_CANDIDATE.retrievedAt}`,
+  `License: MIT (tagged LICENSE SHA-256: ${UPSTREAM_VIVARI_100_CANDIDATE.licenseSha256})`,
   'Disposition: not adopted; migration candidate only.',
 ];
 const narrowClaim = 'does not claim that BOLT-WC-005 or BOLT-WC-006 is compatible, and it cannot change either status without the required real Chrome proof';

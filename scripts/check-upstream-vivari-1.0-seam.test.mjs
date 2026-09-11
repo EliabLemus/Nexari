@@ -13,6 +13,9 @@ const VALID_MANIFEST = {
       version: '1.0.0',
       sha: CANDIDATE_SHA,
       source: 'https://github.com/maitrungduc1410/vivari.git',
+      gitRef: 'refs/tags/v1.0.0',
+      retrievedAt: '2026-09-04T19:20:19Z',
+      licenseSha256: '30a6c0cfc55b5c36932f8438db7925460283f72c75b5f7d32efbeaadb9b75d73',
     },
     adoptionDisposition: 'downgrade',
     adoptionBoundary: 'evaluated-not-adopted',
@@ -134,6 +137,38 @@ test('fails closed when the manifest candidate source is absent or repointed fro
       () => validateSeamProbeReport(baseReport(), manifest),
       /source must exactly match the ledger-recorded upstream URL/,
       String(source),
+    );
+  }
+});
+
+test('fails closed when any immutable candidate provenance field differs from the source ledger', () => {
+  const drifts = {
+    package: '@untrusted/vivari',
+    version: '0.0.0',
+    gitRef: 'refs/tags/v9.9.9',
+    retrievedAt: '1970-01-01T00:00:00Z',
+    licenseSha256: 'deadbeef',
+  };
+
+  for (const [field, value] of Object.entries(drifts)) {
+    const manifest = structuredClone(VALID_MANIFEST);
+    manifest.migration.candidate[field] = value;
+    assert.throws(
+      () => validateSeamProbeReport(baseReport(), manifest),
+      new RegExp(`candidate ${field} must exactly match the ledger-recorded value`),
+      field,
+    );
+  }
+});
+
+test('fails closed when an immutable candidate provenance field is absent from the manifest', () => {
+  for (const field of ['package', 'version', 'gitRef', 'retrievedAt', 'licenseSha256']) {
+    const manifest = structuredClone(VALID_MANIFEST);
+    delete manifest.migration.candidate[field];
+    assert.throws(
+      () => validateSeamProbeReport(baseReport(), manifest),
+      new RegExp(`candidate ${field} must exactly match the ledger-recorded value`),
+      field,
     );
   }
 });
