@@ -13,6 +13,9 @@ const VALID_MANIFEST = {
       version: '1.0.0',
       sha: CANDIDATE_SHA,
       source: 'https://github.com/maitrungduc1410/vivari.git',
+      gitRef: 'refs/tags/v1.0.0',
+      licenseSha256: '30a6c0cfc55b5c36932f8438db7925460283f72c75b5f7d32efbeaadb9b75d73',
+      retrievedAt: '2026-09-04T19:20:19Z',
     },
     adoptionDisposition: 'downgrade',
     adoptionBoundary: 'evaluated-not-adopted',
@@ -134,6 +137,26 @@ test('fails closed when the manifest candidate source is absent or repointed fro
       () => validateSeamProbeReport(baseReport(), manifest),
       /source must exactly match the ledger-recorded upstream URL/,
       String(source),
+    );
+  }
+});
+
+test('fails closed when the static seam candidate identity drifts from the ledger package, version, tag, license, or retrieval timestamp', () => {
+  for (const [path, value] of [
+    [['migration', 'candidate', 'package'], '@other/core'],
+    [['migration', 'candidate', 'version'], '1.0.1'],
+    [['migration', 'candidate', 'gitRef'], 'refs/tags/v1.0.1'],
+    [['migration', 'candidate', 'licenseSha256'], 'deadbeef'],
+    [['migration', 'candidate', 'retrievedAt'], '2026-09-04T19:20:20Z'],
+  ]) {
+    const manifest = structuredClone(VALID_MANIFEST);
+    let target = manifest;
+    for (const key of path.slice(0, -1)) target = target[key];
+    target[path.at(-1)] = value;
+    assert.throws(
+      () => validateSeamProbeReport(baseReport(), manifest),
+      /candidate identity must exactly match the ledger/,
+      path.join('.'),
     );
   }
 });

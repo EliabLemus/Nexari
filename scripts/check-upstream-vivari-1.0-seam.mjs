@@ -12,6 +12,13 @@ const runtimeDir = path.join(root, 'runtime', 'vivari');
 // Ledger-recorded candidate (@vivari/core@1.0.0, THIRD_PARTY_NOTICES.md).
 const LEDGER_CANDIDATE_SHA = '2629c71097238400c45aefa213ef61df4794c2b7';
 const LEDGER_CANDIDATE_SOURCE = 'https://github.com/maitrungduc1410/vivari.git';
+const LEDGER_CANDIDATE_IDENTITY = Object.freeze({
+  package: '@vivari/core',
+  version: '1.0.0',
+  gitRef: 'refs/tags/v1.0.0',
+  licenseSha256: '30a6c0cfc55b5c36932f8438db7925460283f72c75b5f7d32efbeaadb9b75d73',
+  retrievedAt: '2026-09-04T19:20:19Z',
+});
 // Owned fork pin (see runtime/PATCHES.md); the submodule must not move.
 const OWNED_FORK_GITLINK = '26f1d6222942a09411292ea6e55053f3729436ca';
 
@@ -122,6 +129,13 @@ export function validateSeamProbeReport(report, manifest) {
     throw new Error(
       `the manifest candidate source must exactly match the ledger-recorded upstream URL ${LEDGER_CANDIDATE_SOURCE}`,
     );
+  }
+  for (const [field, expected] of Object.entries(LEDGER_CANDIDATE_IDENTITY)) {
+    if (manifest.migration.candidate[field] !== expected) {
+      throw new Error(
+        `the static seam candidate identity must exactly match the ledger: ${field}=${String(manifest.migration.candidate[field])}, expected ${expected}`,
+      );
+    }
   }
   if (report.gitlinkSha !== OWNED_FORK_GITLINK) {
     throw new Error(
