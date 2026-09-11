@@ -8,6 +8,7 @@
       "gitRef": "refs/tags/v1.0.0"
     },
     "adoptionDisposition": "downgrade",
+    "adoptionBoundary": "evaluated-not-adopted",
     "ownedFork": {
       "gitlink": "26f1d6222942a09411292ea6e55053f3729436ca",
       "unrelatedHistoryToCandidate": false,

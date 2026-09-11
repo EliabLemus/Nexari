@@ -179,6 +179,14 @@ export function validateSeamProbeReport(report, manifest) {
       `the manifest's adoptionDisposition=${String(manifest.migration?.adoptionDisposition)} contradicts the probed ${measuredDirection} direction; expected ${expectedDisposition}`,
     );
   }
+  if (
+    expectedDisposition === 'downgrade' &&
+    manifest.migration?.adoptionBoundary !== 'evaluated-not-adopted'
+  ) {
+    throw new Error(
+      'a downgrade candidate must explicitly remain evaluated, not adopted; migration code must not start from an older published tag',
+    );
+  }
 
   // Prose lineage records caused the original shallow-artifact confusion, so a
   // quoted "N commits" distance must agree with the live probe or the record

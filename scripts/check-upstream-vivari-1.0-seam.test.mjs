@@ -10,6 +10,7 @@ const VALID_MANIFEST = {
   migration: {
     candidate: { package: '@vivari/core', version: '1.0.0', sha: CANDIDATE_SHA },
     adoptionDisposition: 'downgrade',
+    adoptionBoundary: 'evaluated-not-adopted',
     ownedFork: { unrelatedHistoryToCandidate: false, lineageDirection: 'candidate-ancestor' },
     lineageNote: 'v1.0.0 is a strict ancestor of the owned fork (101 commits behind).',
   },
@@ -180,6 +181,15 @@ test('rejects a migration disposition that contradicts the measured lineage dire
   assert.throws(
     () => validateSeamProbeReport(baseReport(), manifest),
     /adoptionDisposition=upgrade contradicts the probed candidate-ancestor direction/,
+  );
+});
+
+test('requires an explicit non-adoption boundary when the candidate is a downgrade', () => {
+  const manifest = structuredClone(VALID_MANIFEST);
+  delete manifest.migration.adoptionBoundary;
+  assert.throws(
+    () => validateSeamProbeReport(baseReport(), manifest),
+    /downgrade candidate must explicitly remain evaluated, not adopted/,
   );
 });
 
