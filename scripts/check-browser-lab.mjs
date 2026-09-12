@@ -40,4 +40,8 @@ for (const needle of ['Cross-Origin-Opener-Policy', 'same-origin', 'Cross-Origin
 for (const needle of ['serveNexariAssets', "'/assets/'", "'/vendor/'", 'runtime/vivari/packages/core/dist/assets', 'runtime/vivari/packages/studio/public/vendor', 'fs.lstatSync', 'isSymbolicLink', 'fs.cpSync']) {
   if (!config.includes(needle)) throw new Error(`browser lab must serve the pinned Vivari asset ${needle}`);
 }
+const runner = await readFile(path.join(root, 'e2e', 'browser-smoke-runner.mjs'), 'utf8');
+for (const needle of ['mkdtemp', "'nexari-chrome-'", '--remote-debugging-address=127.0.0.1', '--user-data-dir=', 'terminateChild(chrome)', 'rm(profileDir, { recursive: true, force: true })']) {
+  if (!runner.includes(needle)) throw new Error(`browser proof runner must own fresh loopback Chrome cleanup: ${needle}`);
+}
 console.log('browser lab static contract: PASS');

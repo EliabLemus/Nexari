@@ -6,6 +6,10 @@ const cdpUrl = process.env.NEXARI_CHROME_CDP_URL;
 if (!cdpUrl) {
   throw new Error('NEXARI_CHROME_CDP_URL is required; provide an explicitly approved isolated Chrome DevTools endpoint.');
 }
+const parsedCdpUrl = new URL(cdpUrl);
+if (parsedCdpUrl.protocol !== 'http:' || parsedCdpUrl.hostname !== '127.0.0.1') {
+  throw Object.assign(new Error('NEXARI_CHROME_CDP_URL must be bound only to http://127.0.0.1.'), { code: 'CDP_LOOPBACK_REQUIRED' });
+}
 
 const labUrl = 'http://127.0.0.1:4174';
 const nonIsolatedLabUrl = 'http://127.0.0.1:4175';
@@ -28,7 +32,7 @@ let browser;
 try {
   await waitFor(() => fetch(labUrl).then((response) => response.ok));
   await waitFor(() => fetch(nonIsolatedLabUrl).then((response) => response.ok));
-  const version = await (await fetch(`${cdpUrl}/json/version`)).json();
+  const version = await (await fetch(new URL('/json/version', parsedCdpUrl))).json();
   browser = new WebSocket(version.webSocketDebuggerUrl);
   await once(browser, 'open');
   let nextId = 0;
