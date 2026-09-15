@@ -40,6 +40,24 @@ test('BOLT-WC-005 remains blocked until a shell browser proof exists, while reco
   );
 });
 
+test('BOLT-WC-006 remains blocked while a structural audit records the exact missing terminal primitives', async () => {
+  const matrix = await readFile(matrixUrl, 'utf8');
+  assert.match(
+    matrix,
+    /^\| BOLT-WC-006 \| must-have \| terminal: Interactive shell process exposes input, merged output, terminal cols\/rows, resize and kill\. \| app\/utils\/shell\.ts:11-87; app\/lib\/stores\/terminal\.ts:50-61 \| e2e\/browser-smoke\.e2e\.mjs \(actual shell diagnostic plus explicit `interactive_terminal: unsupported` capability\) \| blocked \(explicitly unavailable; pinned shell diagnostic exit 127; structural audit: contract, owned runtime and protocol expose no terminal dimensions, resize or SIGWINCH primitive\) \|$/m,
+    'BOLT-WC-006 must stay blocked with the precise structural gap recorded until the owned runtime actually gains terminal primitives and they are proven in a browser',
+  );
+});
+
+test('BOLT-WC-006 structural audit: owned sources still expose no terminal dimension, resize or SIGWINCH primitive', async () => {
+  const contractSource = await readFile(new URL('../packages/runtime-contract/src/index.ts', import.meta.url), 'utf8');
+  const runtimeSpawnOptions = await readFile(new URL('../runtime/vivari/packages/core/src/types.ts', import.meta.url), 'utf8');
+  const runtimeProtocol = await readFile(new URL('../runtime/vivari/packages/protocol/syscall.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(contractSource, /\bresize\b/, 'the runtime contract gained a resize primitive: prove terminal resize in a real browser against the owned runtime before relaxing the BOLT-WC-006 blocked row or this audit');
+  assert.doesNotMatch(runtimeSpawnOptions, /\bterminal\s*\??:|\bcolumns\b|\brows\b/, 'the owned runtime spawn options gained terminal dimensions: prove them in a real browser before relaxing the BOLT-WC-006 blocked row or this audit');
+  assert.doesNotMatch(runtimeProtocol, /\bSIGWINCH\b/, 'the owned runtime signal protocol gained SIGWINCH: prove guest-visible resize in a real browser before relaxing the BOLT-WC-006 blocked row or this audit');
+});
+
 test('BOLT-WC-017 is only marked proven with the isolated and non-isolated browser-lab proof', async () => {
   const matrix = await readFile(matrixUrl, 'utf8');
   assert.match(
