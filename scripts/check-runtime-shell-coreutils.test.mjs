@@ -6,19 +6,21 @@ import { fileURLToPath } from 'node:url';
 // Focused deterministic audit for the BOLT-WC-005 shell leg: boots the owned
 // Vivari runtime's Node-mode kernel (Rust/Wasm VFS worker + process workers,
 // no adapter, no browser) and pins EXACTLY what the guest `sh` can and cannot
-// do today. The compatibility matrix rows for BOLT-WC-005/BOLT-WC-006 stay
-// `blocked` and the browser lab asserts `sh printf` exits 127
-// (labs/browser-smoke/src/main.ts, shellCommandUnavailableProof); this file is
-// the runtime-level counterpart so the pinned failure cannot silently change:
+// do today. The compatibility matrix row for BOLT-WC-006 stays `blocked` and
+// the browser lab proves the printf shell leg positively
+// (labs/browser-smoke/src/main.ts, shellSpawnProof); this file is the
+// runtime-level counterpart so the guest shell contract cannot silently change:
 // - shell builtins work (echo, pwd, exit codes, && / || sequencing);
 // - external coreutils installed under /bin resolve (ls);
-// - external programs NOT in the clean-room coreutils set fail typed
-//   (`sh: printf: not found` + exit 127) — the exact gap the matrix records.
+// - the printf coreutil formats arguments with an observable exit, and an
+//   unsupported directive fails typed rather than silently mis-formatting;
+// - external programs NOT in the clean-room coreutils set still fail typed
+//   (`sh: seq: not found` + exit 127) — seq is deliberately absent, so this
+//   stays the pinned not-found shape for any future uninstalled command.
 //
-// If a future change ships a printf coreutil or alters the typed failure, this
-// file fails first; a positive browser proof (AC-4) remains the only path that
-// may unblock the matrix row. The kernel source is the pinned submodule;
-// nothing here may patch it at test time.
+// If a future change removes the printf coreutil or alters the typed
+// not-found failure, this file fails first. The kernel source is the pinned
+// submodule; nothing here may patch it at test time.
 
 const runtimeRoot = fileURLToPath(new URL('../runtime/vivari/', import.meta.url));
 const kernelUrl = new URL('packages/kernel-host/kernel.js', `file://${runtimeRoot}`);
@@ -90,7 +92,7 @@ test('node-mode kernel boots, installs coreutils under /bin, and resolves sh', a
   const listing = await runShell(kernel, 'ls /bin');
   assert.equal(listing.code, 0, `ls /bin must exit 0, got ${listing.code}`);
   assert.ok(listing.stdout.split('\n').includes('sh.js'), 'the clean-room sh must be installed under /bin');
-  assert.ok(!listing.stdout.split('\n').includes('printf.js'), 'printf must NOT be installed (pinned WC-005 gap)');
+  assert.ok(listing.stdout.split('\n').includes('printf.js'), 'the printf coreutil must be installed under /bin');
 });
 
 test('guest sh proves builtins: echo literal, exit codes and cwd via pwd', async (t) => {
@@ -101,9 +103,35 @@ test('guest sh proves builtins: echo literal, exit codes and cwd via pwd', async
   assert.equal(echo.stdout, 'nexari-shell-process\n');
   const status = await runShell(kernel, 'exit 3');
   assert.equal(status.code, 3, 'sh -c exit 3 must propagate exit code 3');
-  const cwd = await kernel.start('sh', ['-c', 'pwd'], { cwd: '/work', capture: true });
+  const cwd = await runShell(kernel, 'pwd', { cwd: '/work' });
   assert.equal(cwd.code, 0, `pwd must exit 0, got ${cwd.code}`);
   assert.equal(cwd.stdout.trim(), '/work', 'sh -c pwd must report exactly the cwd passed to spawn');
+});
+
+test('POSITIVE: printf coreutil formats arguments with an observable exit (BOLT-WC-005)', async (t) => {
+  const { kernel, teardown } = await makeKernel();
+  t.after(teardown);
+  // Literal text + trailing newline escape: the browser E2E pins exactly this
+  // shape (exit 0, stdout with the trailing newline, empty stderr).
+  const literal = await runShell(kernel, "printf 'nexari-shell-process\\n'");
+  assert.equal(literal.code, 0, `printf literal must exit 0, got ${literal.code}`);
+  assert.equal(literal.stdout, 'nexari-shell-process\n');
+  assert.equal(literal.stderr, '', 'printf must not emit stderr on success');
+  // %s consumes an argument; %d formats an integer; %% is a literal percent.
+  const specifiers = await runShell(kernel, "printf '%s scored %d%%\\n' nexari 99");
+  assert.equal(specifiers.code, 0, `printf specifiers must exit 0, got ${specifiers.code}`);
+  assert.equal(specifiers.stdout, 'nexari scored 99%\n');
+  // POSIX format reuse: after consuming `a b`, the leftover `c` starts a second
+  // pass where the second %s has no argument and degrades to '' (host GNU
+  // printf prints exactly "a-b\nc-\n").
+  const reused = await runShell(kernel, "printf '%s-%s\\n' a b c");
+  assert.equal(reused.code, 0, `printf format reuse must exit 0, got ${reused.code}`);
+  assert.equal(reused.stdout, 'a-b\nc-\n');
+  // An unsupported directive must fail TYPED, never silently emit wrong output.
+  const unsupported = await runShell(kernel, "printf '%f\\n' 1.5");
+  assert.equal(unsupported.code, 1, `printf unsupported directive must exit 1, got ${unsupported.code}`);
+  assert.equal(unsupported.stdout, '', 'an unsupported directive must not emit stdout');
+  assert.match(unsupported.stderr, /printf: %f: unsupported directive/);
 });
 
 test('guest sh sequences commands and recovers from a missing command', async (t) => {
@@ -121,8 +149,8 @@ test('guest sh sequences commands and recovers from a missing command', async (t
 test('PINNED FAILURE: external coreutil outside the clean-room set fails typed (BOLT-WC-005)', async (t) => {
   const { kernel, teardown } = await makeKernel();
   t.after(teardown);
-  const printf = await runShell(kernel, 'printf nexari-shell-process');
-  assert.equal(printf.code, 127, `printf must exit 127 until a browser proof unblocks it, got ${printf.code}`);
-  assert.equal(printf.stdout, '', 'a not-found command must not emit stdout');
-  assert.equal(printf.stderr, 'sh: printf: not found\n', 'the failure must stay typed exactly as the matrix records it');
+  const seq = await runShell(kernel, 'seq 3');
+  assert.equal(seq.code, 127, `seq must exit 127 (deliberately absent from the clean-room coreutils set), got ${seq.code}`);
+  assert.equal(seq.stdout, '', 'a not-found command must not emit stdout');
+  assert.equal(seq.stderr, 'sh: seq: not found\n', 'the failure must stay typed exactly as the matrix records it');
 });
