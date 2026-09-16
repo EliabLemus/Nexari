@@ -29,7 +29,7 @@ const workerTransferUrl = new URL('packages/kernel-host/worker-transfer.js', `fi
 const fsWorkerUrl = new URL('scripts/fs-worker.mjs', `file://${runtimeRoot}`);
 const processWorkerUrl = new URL('scripts/process-worker.mjs', `file://${runtimeRoot}`);
 
-async function makeKernel() {
+async function makeKernel({ stdout } = {}) {
   const { Kernel } = await import(kernelUrl.href);
   const { createKernelFs } = await import(kernelFsUrl.href);
   const { initTransferList } = await import(workerTransferUrl.href);
@@ -68,7 +68,7 @@ async function makeKernel() {
     };
   };
 
-  const kernel = new Kernel({ fs: kernelFs.fs, spawnWorker });
+  const kernel = new Kernel({ fs: kernelFs.fs, spawnWorker, stdout });
   kernel.installCoreutils();
   return {
     kernel,
@@ -172,7 +172,36 @@ test('AC-1 initial TTY: terminal-capable guest observes isTTY and configured dim
   assert.equal(probe.code, 0, `TTY dims probe must exit 0, got ${probe.code}: ${probe.stderr}`);
   const observed = JSON.parse(probe.stdout);
   assert.equal(observed.out, true, 'process.stdout.isTTY must be true for a terminal-capable spawn');
+  // stderr shares the single tty flag for now; per-stream TTY truth (stdout tty,
+  // stderr pipe) is a deferred later AC and will tighten this assertion.
   assert.equal(observed.err, true, 'process.stderr.isTTY must be true for a terminal-capable spawn');
   assert.equal(observed.cols, 100, 'process.stdout.columns must carry the configured width');
   assert.equal(observed.rows, 30, 'process.stdout.rows must carry the configured height');
+});
+
+test('AC-1 default TTY semantics: uncaptured spawns face a terminal, capture-only stays pipe-shaped (BOLT-WC-006 resize step 1)', async (t) => {
+  const outChunks = [];
+  const { kernel, teardown } = await makeKernel({ stdout: (chunk) => outChunks.push(Buffer.from(chunk)) });
+  t.after(teardown);
+  // NEXARI-WC006-RESIZE-001 AC-1 (Challenger finding, review 2026-09-16): the
+  // runtime's pre-existing rule is tty = !capture when the spawner says nothing,
+  // and the builtins' process now reports that answer instead of a hardcoded
+  // false. Pin BOTH default paths so the contract cannot silently drift:
+  // - uncaptured (no tty, no capture) -> isTTY true + 80x24 defaults;
+  // - capture-only -> isTTY false + 80x24 defaults, output captured not sunk.
+  const probeScript = '-e', probeArgs = ['console.log(JSON.stringify({out: process.stdout.isTTY === true, cols: process.stdout.columns, rows: process.stdout.rows}))'];
+  const interactive = await kernel.start('node', [probeScript, probeArgs[0]], {});
+  assert.equal(interactive.code, 0, `uncaptured probe must exit 0, got ${interactive.code}: ${interactive.stderr}`);
+  const seen = JSON.parse(Buffer.concat(outChunks).toString());
+  assert.equal(seen.out, true, 'an uncaptured spawn faces a terminal (tty derives from !capture)');
+  assert.equal(seen.cols, 80, 'columns fall back to 80 when the spawner sends none');
+  assert.equal(seen.rows, 24, 'rows fall back to 24 when the spawner sends none');
+
+  const captured = await kernel.start('node', [probeScript, probeArgs[0]], { capture: true });
+  assert.equal(captured.code, 0, `captured probe must exit 0, got ${captured.code}: ${captured.stderr}`);
+  const observed = JSON.parse(captured.stdout);
+  assert.equal(observed.out, false, 'a capture-only spawn stays pipe-shaped (isTTY false)');
+  assert.equal(observed.cols, 80, 'captured spawn still gets the 80-column default');
+  assert.equal(observed.rows, 24, 'captured spawn still gets the 24-row default');
+  assert.equal(outChunks.length, 1, 'captured output must not leak to the host stdout sink');
 });
