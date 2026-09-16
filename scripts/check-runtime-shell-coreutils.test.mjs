@@ -243,8 +243,8 @@ test('AC-2 resize control: a live terminal-capable process observes new dimensio
   // and the next observation sees them. The probe prints {seq, cols, rows} on a
   // timer (Challenger protocol, review 2026-09-16): seq>=1 is awaited BEFORE the
   // resize so the pre-state is truly observed, then a post-resize tick must show
-  // 100x30 within a bounded window. SIGWINCH — telling the guest a resize
-  // HAPPENED — is the next step of the spec and is deliberately not asserted.
+  // 100x30 within a bounded window. The resize NOTIFICATION (SIGWINCH) is pinned
+  // by the step-3 tests below.
   const pid = kernel.launch('node', ['-e', resizeProbeScript], {});
   assert.ok(pid > 0, 'launch must return a real pid');
   const lines = () => sinkLines(outChunks);
@@ -288,4 +288,94 @@ test('AC-2 resize control: invalid dims are refused and an exited pid is false (
   const done = await kernel.start('node', ['-e', ''], { capture: true });
   assert.equal(done.code, 0, `the short probe must exit 0, got ${done.code}: ${done.stderr}`);
   assert.equal(kernel.resize(done.pid, 100, 30), false, 'resize on an exited pid must return false');
+});
+
+// NEXARI-WC006-RESIZE-001 step 3: the resize NOTIFICATION. A successful
+// kernel.resize() tells the guest a resize HAPPENED — Node's `process.on('SIGWINCH', …)`
+// — on a controlled loop turn, after the streams already carry the new dims. This
+// is the runtime's Node-emulation layer only: SIGWINCH deliberately stays OUT of
+// packages/protocol/syscall.js (the kernel's catchable-signal path applies a
+// handler-less signal as TERMINATION — the default action of SIGWINCH is
+// ignore — and the frozen structural audit pins the protocol free of SIGWINCH
+// until a real-browser proof lands). One worker = one createRuntime() = one
+// `process` (Challenger finding, review 2026-09-16): postToProc(pid, …) routes
+// to exactly that worker, so per-pid fan-out has no seam to get wrong here.
+const sigwinchProbeScript =
+  "process.on('SIGWINCH', () => { " +
+  "console.log(JSON.stringify({ winch: true, cols: process.stdout.columns, rows: process.stdout.rows })); " +
+  "}); " +
+  "let seq = 0; setInterval(() => { seq += 1; console.log(JSON.stringify({seq})); }, 60);";
+
+test('AC-3 resize notification: a handled SIGWINCH fires after the new dims are visible (BOLT-WC-006 resize step 3)', async (t) => {
+  const outChunks = [];
+  const { kernel, teardown } = await makeKernel({ stdout: (chunk) => outChunks.push(Buffer.from(chunk)) });
+  t.after(teardown);
+  const pid = kernel.launch('node', ['-e', sigwinchProbeScript], {});
+  assert.ok(pid > 0, 'launch must return a real pid');
+  const lines = () => sinkLines(outChunks);
+  // stop() in a finally: a red phase must still terminate the guest worker, or
+  // its live setInterval keeps the node --test process alive forever.
+  try {
+    await until(() => lines().some((o) => o.seq >= 1), 5000, 'the first probe tick');
+    assert.equal(kernel.resize(pid, 100, 30), true, 'resize on a live pid must succeed');
+    // The handler observes the NEW dimensions: dims are applied before the event
+    // is emitted, so a TUI redrawing from inside its WINCH handler is correct.
+    await until(
+      () => lines().some((o) => o.winch === true && o.cols === 100 && o.rows === 30),
+      5000,
+      'the SIGWINCH handler observing 100x30',
+    );
+  } finally {
+    kernel.stop(pid);
+  }
+});
+
+test('AC-3 resize notification: an unhandled SIGWINCH must not terminate the process (BOLT-WC-006 resize step 3)', async (t) => {
+  const outChunks = [];
+  const { kernel, teardown } = await makeKernel({ stdout: (chunk) => outChunks.push(Buffer.from(chunk)) });
+  t.after(teardown);
+  // Regression trap for the kernel's catchable-signal path (which terminates a
+  // handler-less process with 143): SIGWINCH delivery must keep a listener-less
+  // guest alive, and the loop must still turn so its timer keeps ticking.
+  const noHandlerScript = resizeProbeScript;
+  const pid = kernel.launch('node', ['-e', noHandlerScript], {});
+  assert.ok(pid > 0, 'launch must return a real pid');
+  const lines = () => sinkLines(outChunks);
+  try {
+    await until(() => lines().some((o) => o.seq >= 1), 5000, 'the first probe tick');
+    assert.equal(kernel.resize(pid, 100, 30), true, 'resize on a live pid must succeed');
+    await until(
+      () => lines().some((o) => o.seq >= 2 && o.cols === 100 && o.rows === 30),
+      5000,
+      'a post-resize tick observing 100x30 with no listener',
+    );
+  } finally {
+    kernel.stop(pid);
+  }
+});
+
+test('AC-3 resize notification: refused resize posts no event and a dead pid returns false (BOLT-WC-006 resize step 3)', async (t) => {
+  const outChunks = [];
+  const { kernel, teardown } = await makeKernel({ stdout: (chunk) => outChunks.push(Buffer.from(chunk)) });
+  t.after(teardown);
+  const pid = kernel.launch('node', ['-e', sigwinchProbeScript], {});
+  assert.ok(pid > 0, 'launch must return a real pid');
+  const lines = () => sinkLines(outChunks);
+  try {
+    await until(() => lines().some((o) => o.seq >= 1), 5000, 'the first probe tick');
+    // The kernel refuses invalid dims and posts nothing, so no SIGWINCH can be
+    // enqueued; the streams keep their boot dimensions.
+    for (const dims of [
+      [0, 30],
+      [100, -1],
+      ['100', 30],
+    ]) {
+      assert.equal(kernel.resize(pid, dims[0], dims[1]), false, `resize(${JSON.stringify(dims)}) must be refused`);
+    }
+  } finally {
+    kernel.stop(pid);
+  }
+  assert.equal(kernel.resize(pid, 100, 30), false, 'resize on a stopped pid must return false');
+  const winchLines = lines().filter((o) => o.winch === true);
+  assert.equal(winchLines.length, 0, 'no SIGWINCH may fire for refused resizes or dead pids');
 });
