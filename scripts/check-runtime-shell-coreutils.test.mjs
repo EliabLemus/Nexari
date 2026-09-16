@@ -154,3 +154,25 @@ test('PINNED FAILURE: external coreutil outside the clean-room set fails typed (
   assert.equal(seq.stdout, '', 'a not-found command must not emit stdout');
   assert.equal(seq.stderr, 'sh: seq: not found\n', 'the failure must stay typed exactly as the matrix records it');
 });
+
+test('AC-1 initial TTY: terminal-capable guest observes isTTY and configured dimensions (BOLT-WC-006 resize step 1)', async (t) => {
+  const { kernel, teardown } = await makeKernel();
+  t.after(teardown);
+  // NEXARI-WC006-RESIZE-001 AC-1: a process spawned terminal-capable observes
+  // process.stdout.isTTY === true plus configured positive finite integer
+  // columns/rows. capture+tty together model a pty harness: output is
+  // collected, but the streams face a terminal — the spawner must say so
+  // explicitly (capture alone honestly means pipes). This is the first half of
+  // the spec; resize + SIGWINCH are later steps and must not silently appear here.
+  const probe = await kernel.start(
+    'node',
+    ['-e', 'console.log(JSON.stringify({out: process.stdout.isTTY === true, err: process.stderr.isTTY === true, cols: process.stdout.columns, rows: process.stdout.rows}))'],
+    { capture: true, tty: true, columns: 100, rows: 30 },
+  );
+  assert.equal(probe.code, 0, `TTY dims probe must exit 0, got ${probe.code}: ${probe.stderr}`);
+  const observed = JSON.parse(probe.stdout);
+  assert.equal(observed.out, true, 'process.stdout.isTTY must be true for a terminal-capable spawn');
+  assert.equal(observed.err, true, 'process.stderr.isTTY must be true for a terminal-capable spawn');
+  assert.equal(observed.cols, 100, 'process.stdout.columns must carry the configured width');
+  assert.equal(observed.rows, 30, 'process.stdout.rows must carry the configured height');
+});
