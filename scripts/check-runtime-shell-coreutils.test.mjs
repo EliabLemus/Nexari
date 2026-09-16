@@ -205,3 +205,87 @@ test('AC-1 default TTY semantics: uncaptured spawns face a terminal, capture-onl
   assert.equal(observed.rows, 24, 'captured spawn still gets the 24-row default');
   assert.equal(outChunks.length, 1, 'captured output must not leak to the host stdout sink');
 });
+
+async function until(fn, timeoutMs, what) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (fn()) return;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  assert.fail(`timed out after ${timeoutMs}ms waiting for ${what}`);
+}
+
+// NEXARI-WC006-RESIZE-001 step 2 probe: every tick is a FRESH read of
+// process.stdout's dimensions, printed as one JSON line to the host sink.
+const resizeProbeScript =
+  'let seq = 0; setInterval(() => { seq += 1; console.log(JSON.stringify({seq, cols: process.stdout.columns, rows: process.stdout.rows})); }, 60);';
+
+function sinkLines(outChunks) {
+  return Buffer.concat(outChunks)
+    .toString()
+    .split('\n')
+    .filter(Boolean)
+    .map((l) => {
+      try {
+        return JSON.parse(l);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
+test('AC-2 resize control: a live terminal-capable process observes new dimensions (BOLT-WC-006 resize step 2)', async (t) => {
+  const outChunks = [];
+  const { kernel, teardown } = await makeKernel({ stdout: (chunk) => outChunks.push(Buffer.from(chunk)) });
+  t.after(teardown);
+  // kernel.resize(pid, columns, rows) updates a LIVE process's TTY dimensions
+  // and the next observation sees them. The probe prints {seq, cols, rows} on a
+  // timer (Challenger protocol, review 2026-09-16): seq>=1 is awaited BEFORE the
+  // resize so the pre-state is truly observed, then a post-resize tick must show
+  // 100x30 within a bounded window. SIGWINCH — telling the guest a resize
+  // HAPPENED — is the next step of the spec and is deliberately not asserted.
+  const pid = kernel.launch('node', ['-e', resizeProbeScript], {});
+  assert.ok(pid > 0, 'launch must return a real pid');
+  const lines = () => sinkLines(outChunks);
+  await until(() => lines().some((o) => o.seq >= 1), 5000, 'the first probe tick');
+  assert.equal(kernel.resize(pid, 100, 30), true, 'resize on a live pid must succeed');
+  await until(
+    () => lines().some((o) => o.seq >= 2 && o.cols === 100 && o.rows === 30),
+    5000,
+    'a post-resize tick observing 100x30',
+  );
+  kernel.stop(pid);
+});
+
+test('AC-2 resize control: invalid dims are refused and an exited pid is false (BOLT-WC-006 resize step 2)', async (t) => {
+  const outChunks = [];
+  const { kernel, teardown } = await makeKernel({ stdout: (chunk) => outChunks.push(Buffer.from(chunk)) });
+  t.after(teardown);
+  const pid = kernel.launch('node', ['-e', resizeProbeScript], {});
+  assert.ok(pid > 0, 'launch must return a real pid');
+  const lines = () => sinkLines(outChunks);
+  await until(() => lines().some((o) => o.seq >= 1), 5000, 'the first probe tick');
+  // Challenger finding (review 2026-09-16): the kernel refuses invalid dims the
+  // same way it refuses a missing pid — returns false, posts nothing — so the
+  // streams keep the values they booted with (80x24 defaults).
+  for (const dims of [
+    [0, 30],
+    [100, -1],
+    [1.5, 30],
+    [100, 1001],
+    ['100', 30],
+  ]) {
+    assert.equal(kernel.resize(pid, dims[0], dims[1]), false, `resize(${JSON.stringify(dims)}) must be refused`);
+  }
+  await until(() => lines().some((o) => o.seq >= 2), 5000, 'a post-refusal tick');
+  const last = lines().filter((o) => o.seq >= 2).pop();
+  assert.equal(last.cols, 80, 'columns must be unchanged after refusals');
+  assert.equal(last.rows, 24, 'rows must be unchanged after refusals');
+  kernel.stop(pid);
+  assert.equal(kernel.resize(pid, 100, 30), false, 'resize on a stopped pid must return false');
+
+  const done = await kernel.start('node', ['-e', ''], { capture: true });
+  assert.equal(done.code, 0, `the short probe must exit 0, got ${done.code}: ${done.stderr}`);
+  assert.equal(kernel.resize(done.pid, 100, 30), false, 'resize on an exited pid must return false');
+});
