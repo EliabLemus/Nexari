@@ -40,12 +40,12 @@ test('BOLT-WC-005 is only marked proven with the positive browser shell proof, a
   );
 });
 
-test('BOLT-WC-006 remains blocked while its scoped audit records each unproven interactive-terminal requirement', async () => {
+test('BOLT-WC-006 remains blocked on cols/rows resize while its interactive-shell stdin, merged-output and kill legs are browser-proven on the guest REPL', async () => {
   const matrix = await readFile(matrixUrl, 'utf8');
   assert.match(
     matrix,
-    /^\| BOLT-WC-006 \| must-have \| terminal: Interactive shell process exposes input, merged output, terminal cols\/rows, resize and kill\. \| app\/utils\/shell\.ts:11-87; app\/lib\/stores\/terminal\.ts:50-61 \| e2e\/browser-smoke\.e2e\.mjs \(guest shell proven only for one-shot `sh -c` plus explicit `interactive_terminal: unsupported` capability\) \| blocked \(explicitly unavailable: no interactive-shell stdin, merged-output, cols\/rows-resize, or kill browser proof exists; scoped structural audit: runtime contract lacks resize, core spawn options lack terminal dimensions, syscall protocol lacks SIGWINCH or TIOCSWINSZ\) \|$/m,
-    'BOLT-WC-006 must stay blocked with the precise scoped structural gap recorded until the owned runtime actually gains terminal primitives and they are proven in a browser',
+    /^\| BOLT-WC-006 \| must-have \| terminal: Interactive shell process exposes input, merged output, terminal cols\/rows, resize and kill\. \| app\/utils\/shell\.ts:11-87; app\/lib\/stores\/terminal\.ts:50-61 \| e2e\/browser-smoke\.e2e\.mjs \(interactive guest `sh` REPL driven over streams: prompt-synced open-stdin keystrokes with echo-safe split markers, merged output with stream-tagged stderr from a nested one-shot shell, kill and closed merged stream; explicit `interactive_terminal: unsupported` capability\) \| blocked \(interactive-shell stdin, merged output and kill are browser-proven on the guest `sh` REPL over streams — no pty is involved and the `interactive_terminal` capability stays unsupported; remaining gap: terminal cols\/rows and resize only, structurally absent per scoped audit: runtime contract lacks resize, core spawn options lack terminal dimensions, syscall protocol lacks SIGWINCH or TIOCSWINSZ\) \|$/m,
+    'BOLT-WC-006 may only narrow its blocked rationale once interactive-shell stdin, merged output and kill are proven in a real browser over the owned runtime, and it must stay blocked while resize remains structurally absent',
   );
 });
 

@@ -202,6 +202,21 @@ try {
     'printf-exit-0-exact-stdout',
     'the owned Vivari process bridge must prove the guest shell (printf) positively in the browser',
   );
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.wc006InteractiveStdinProof`),
+    'prompt-synced-open-stdin-executed',
+    'the guest shell REPL must execute keystrokes delivered over a never-closed interactive stdin after its prompt is observed',
+  );
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.wc006InteractiveMergedProof`),
+    'stderr-tagged-interleaved-merged',
+    'the interactive shell must deliver a stream-tagged stderr chunk interleaved in the merged output view',
+  );
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.wc006InteractiveKillProof`),
+    'killed-exited-merged-closed',
+    'a killed interactive shell must settle a numeric exit and close its merged output stream',
+  );
   assert.match(
     await evaluate(`document.querySelector('#status')?.dataset.portOpen`),
     /^3111:\/preview\/3111\/$/,

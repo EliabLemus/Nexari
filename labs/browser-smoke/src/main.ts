@@ -279,6 +279,78 @@ async function bootRuntime() {
     throw new Error(`Vivari guest shell printf proof failed (exit ${shellExitCode}, output ${JSON.stringify(shellOutput)})`);
   }
   status.dataset.shellSpawnProof = 'printf-exit-0-exact-stdout';
+  // BOLT-WC-006 partial proof: drive the guest shell's interactive REPL over its
+  // real streams (no pty, no terminal dimensions — the capability stays
+  // unsupported until resize exists). The writer is never closed, so the shell
+  // stays parked at its prompt exactly like a live terminal session.
+  const interactiveShell = await runtime.spawn('sh');
+  const interactiveWriter = interactiveShell.input.getWriter();
+  let interactiveMerged = '';
+  let interactiveMergedClosed = false;
+  void (async () => {
+    try {
+      for await (const chunk of interactiveShell.output) interactiveMerged += chunk;
+    } catch {
+      // A faulted stream still ends the merged view.
+    } finally {
+      interactiveMergedClosed = true;
+    }
+  })();
+  let interactiveStderr = '';
+  void (async () => {
+    try {
+      for await (const chunk of interactiveShell.stderr) interactiveStderr += chunk;
+    } catch {
+      // A faulted stream still ends the stderr view.
+    }
+  })();
+  // Prompt-sync before typing: the REPL announces itself with its cyan prompt,
+  // proving the raw-stdin line editor is attached before keystrokes are sent.
+  const promptSynced = await waitFor(() => interactiveMerged.includes('\x1b[36m') && interactiveMerged.includes('$'), 15_000);
+  if (!promptSynced) {
+    interactiveShell.kill();
+    throw new Error('Vivari interactive guest shell never printed its prompt');
+  }
+  // Echo-safe markers: the REPL echoes every typed keystroke verbatim, so each
+  // marker is typed as quote fragments. Echo can never contain the dequoted
+  // marker; only real execution (the sh lexer strips quotes) can emit it.
+  interactiveWriter.write("echo nexari-'interactive-'stdin-proof\r");
+  if (!(await waitFor(() => interactiveMerged.includes('nexari-interactive-stdin-proof'), 15_000))) {
+    interactiveShell.kill();
+    throw new Error('Vivari interactive guest shell never executed keystrokes from its still-open stdin');
+  }
+  status.dataset.wc006InteractiveStdinProof = 'prompt-synced-open-stdin-executed';
+  // Merged-output leg: an unknown command reaches runSimple's cp.spawn, whose
+  // ENOENT path writes `sh: <cmd>: not found` to stderr. The chunk must arrive
+  // BOTH stream-tagged on the stderr view and interleaved on the merged view.
+  interactiveWriter.write("nexari-'missing-'stderr-proof\r");
+  if (!(await waitFor(() => interactiveStderr.includes('nexari-missing-stderr-proof'), 15_000))) {
+    interactiveShell.kill();
+    throw new Error('Vivari interactive guest shell never emitted a stderr-tagged error chunk');
+  }
+  if (!interactiveMerged.includes('nexari-missing-stderr-proof')) {
+    interactiveShell.kill();
+    throw new Error('Vivari interactive merged output view lost the stderr-tagged chunk');
+  }
+  status.dataset.wc006InteractiveMergedProof = 'stderr-tagged-interleaved-merged';
+  // Kill leg: terminate the parked REPL, observe a settled exit and a closed
+  // merged stream, so terminal consumers can never hang on a killed session.
+  interactiveShell.kill();
+  const interactiveExit = await Promise.race([
+    interactiveShell.exit,
+    new Promise<never>((_, reject) => setTimeout(
+      () => reject(new Error('Vivari interactive guest shell never settled its exit after kill')),
+      15_000,
+    )),
+  ]);
+  if (!Number.isInteger(interactiveExit)) {
+    throw new Error(`Vivari interactive guest shell reported a non-integer exit: ${interactiveExit}`);
+  }
+  const mergedClosedAfterKill = await waitFor(() => interactiveMergedClosed, 5_000);
+  if (!mergedClosedAfterKill) {
+    throw new Error('Vivari interactive merged output stream never closed after kill');
+  }
+  status.dataset.wc006InteractiveKillProof = 'killed-exited-merged-closed';
   if (capabilities.interactive_terminal !== 'unsupported') {
     throw new Error('Vivari interactive terminal support must remain explicitly unavailable until a browser proof exists');
   }
