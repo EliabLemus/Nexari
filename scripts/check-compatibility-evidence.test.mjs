@@ -31,12 +31,12 @@ test('BOLT-WC-004 is only marked proven with the browser-lab stable workdir proo
   );
 });
 
-test('BOLT-WC-005 remains blocked until a shell browser proof exists, while recording the real vendored npm browser proof', async () => {
+test('BOLT-WC-005 is only marked proven with the positive browser shell proof, alongside the real vendored npm proof', async () => {
   const matrix = await readFile(matrixUrl, 'utf8');
   assert.match(
     matrix,
-    /^\| BOLT-WC-005 \| must-have \| spawn: Runtime spawns node, npm and shell-like guest processes with arguments, cwd\/env and observable exit\. \| app\/lib\/runtime\/action-runner\.ts:395; app\/utils\/shell\.ts:7-89 \| e2e\/browser-smoke\.e2e\.mjs \(real node and lazy-loaded vendored npm cwd\/env\/args\/exit; pinned `sh` diagnostic exit 127\) \| blocked \(node and real vendored npm proven; shell unavailable: `sh` reports `printf` not found and exits 127\) \|$/m,
-    'BOLT-WC-005 cannot leave the compatibility gate until the real browser shell behavior is independently proven, even when the vendored npm CLI is proven',
+    /^\| BOLT-WC-005 \| must-have \| spawn: Runtime spawns node, npm and shell-like guest processes with arguments, cwd\/env and observable exit\. \| app\/lib\/runtime\/action-runner\.ts:395; app\/utils\/shell\.ts:7-89 \| e2e\/browser-smoke\.e2e\.mjs \(real node, lazy-loaded vendored npm cwd\/env\/args\/exit and guest `sh` printf: quoted format, exit 0, byte-exact stdout\) \| proven \(node, real vendored npm and the guest shell proven in the browser: `printf` with an explicit trailing-newline format exits 0 with byte-exact stdout; uninstalled commands still fail typed, `sh: seq: not found` \+ exit 127\) \|$/m,
+    'BOLT-WC-005 may only leave the compatibility gate once the guest shell is proven positively in a real browser, alongside the already-proven vendored npm CLI',
   );
 });
 
@@ -44,7 +44,7 @@ test('BOLT-WC-006 remains blocked while its scoped audit records each unproven i
   const matrix = await readFile(matrixUrl, 'utf8');
   assert.match(
     matrix,
-    /^\| BOLT-WC-006 \| must-have \| terminal: Interactive shell process exposes input, merged output, terminal cols\/rows, resize and kill\. \| app\/utils\/shell\.ts:11-87; app\/lib\/stores\/terminal\.ts:50-61 \| e2e\/browser-smoke\.e2e\.mjs \(actual shell diagnostic plus explicit `interactive_terminal: unsupported` capability\) \| blocked \(explicitly unavailable: the pinned shell exits 127, so no interactive-shell stdin, merged-output, cols\/rows-resize, or kill browser proof exists; scoped structural audit: runtime contract lacks resize, core spawn options lack terminal dimensions, syscall protocol lacks SIGWINCH or TIOCSWINSZ\) \|$/m,
+    /^\| BOLT-WC-006 \| must-have \| terminal: Interactive shell process exposes input, merged output, terminal cols\/rows, resize and kill\. \| app\/utils\/shell\.ts:11-87; app\/lib\/stores\/terminal\.ts:50-61 \| e2e\/browser-smoke\.e2e\.mjs \(guest shell proven only for one-shot `sh -c` plus explicit `interactive_terminal: unsupported` capability\) \| blocked \(explicitly unavailable: no interactive-shell stdin, merged-output, cols\/rows-resize, or kill browser proof exists; scoped structural audit: runtime contract lacks resize, core spawn options lack terminal dimensions, syscall protocol lacks SIGWINCH or TIOCSWINSZ\) \|$/m,
     'BOLT-WC-006 must stay blocked with the precise scoped structural gap recorded until the owned runtime actually gains terminal primitives and they are proven in a browser',
   );
 });

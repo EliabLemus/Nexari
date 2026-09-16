@@ -198,9 +198,9 @@ try {
     'the browser DOM must retain falsifiable real npm guest output rather than a host-side imitation',
   );
   assert.equal(
-    await evaluate(`document.querySelector('#status')?.dataset.shellCommandUnavailableProof`),
-    'exit-127-diagnostic',
-    'the owned Vivari process bridge must expose the pinned shell limitation rather than silently claiming shell compatibility',
+    await evaluate(`document.querySelector('#status')?.dataset.shellSpawnProof`),
+    'printf-exit-0-exact-stdout',
+    'the owned Vivari process bridge must prove the guest shell (printf) positively in the browser',
   );
   assert.match(
     await evaluate(`document.querySelector('#status')?.dataset.portOpen`),

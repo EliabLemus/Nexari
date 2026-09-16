@@ -268,14 +268,17 @@ async function bootRuntime() {
   status.dataset.npmExitProof = 'zero';
   write(npmOutput);
   const shellToken = 'nexari-shell-process';
-  const shellProcess = await runtime.spawn('sh', ['-c', `printf ${shellToken}`]);
+  // The audit-proven positive shape (scripts/check-runtime-shell-coreutils.test.mjs):
+  // quoted format with an explicit trailing-newline escape — POSIX printf emits
+  // exactly the format text, never an implicit newline.
+  const shellProcess = await runtime.spawn('sh', ['-c', `printf '${shellToken}\\n'`]);
   let shellOutput = '';
   for await (const chunk of shellProcess.output) shellOutput += chunk;
   const shellExitCode = await shellProcess.exit;
-  if (shellExitCode !== 127 || !shellOutput.includes('not found')) {
-    throw new Error('Vivari shell compatibility changed; add a positive shell browser proof before exposing it');
+  if (shellExitCode !== 0 || shellOutput !== `${shellToken}\n`) {
+    throw new Error(`Vivari guest shell printf proof failed (exit ${shellExitCode}, output ${JSON.stringify(shellOutput)})`);
   }
-  status.dataset.shellCommandUnavailableProof = 'exit-127-diagnostic';
+  status.dataset.shellSpawnProof = 'printf-exit-0-exact-stdout';
   if (capabilities.interactive_terminal !== 'unsupported') {
     throw new Error('Vivari interactive terminal support must remain explicitly unavailable until a browser proof exists');
   }
