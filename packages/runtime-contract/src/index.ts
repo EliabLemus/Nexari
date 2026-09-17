@@ -44,7 +44,13 @@ export interface RuntimeProcess {
   resize(dimensions: RuntimeTerminalDimensions): void;
 }
 
-/** Initial or updated dimensions for an experimental interactive terminal. */
+/** Initial or updated dimensions for an experimental interactive terminal.
+ *
+ * Refusal semantics (pinned by the adapter tests): the owned runtime rejects
+ * invalid dimensions (non-positive or non-finite) inertly — a stale or invalid
+ * resize posts no event and throws nothing, mirroring kernel.resize's boolean
+ * refusal. Callers needing strict validation must check before calling.
+ */
 export interface RuntimeTerminalDimensions {
   columns: number;
   rows: number;

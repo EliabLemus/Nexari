@@ -609,6 +609,26 @@ test('resize fails closed with a typed UNSUPPORTED_CAPABILITY error when the pin
   await runtime.teardown();
 });
 
+test('resize passes invalid dimensions through inertly: the owned runtime refuses them, no typed error (Challenger review 2026-09-16)', async () => {
+  const fake = fakeSdk();
+  let guestResize;
+  fake.instance.spawn = async () => {
+    guestResize = () => {};
+    return { pid: 41, output: stream, stdout: stream, stderr: stream, input: new WritableStream(), exit: Promise.resolve(0), kill() {}, resize: guestResize };
+  };
+  const runtime = createVivariRuntime({ id: 'invalid-dims-resize', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const process = await runtime.spawn('node', ['probe.js']);
+  // The contract pins inert refusal: invalid dims reach the guest seam, which
+  // refuses them without events or errors (kernel.resize boolean refusal).
+  // Callers needing strict validation check before calling — this test freezes
+  // that semantics so a future typed-error flip is a deliberate contract change.
+  process.resize({ columns: 0, rows: 30 });
+  process.resize({ columns: -1, rows: 30 });
+  process.resize({ columns: Number.NaN, rows: 30 });
+  await runtime.teardown();
+});
+
 test('teardown clears an attached preview source so a stale document cannot outlive the runtime', async () => {
   const fake = fakeSdk();
   const preview = {

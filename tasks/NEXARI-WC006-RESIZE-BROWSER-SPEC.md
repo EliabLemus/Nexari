@@ -57,3 +57,9 @@ restricted code, Bolt integration, deployment, push/tag/release.
 
 - 2026-09-16 pre-mortem: REVISE_CONTRACT (findings above, transcript
   ~/.hermes/cache/delegation/live/deleg_ffb9b43c/task-0.log).
+- 2026-09-16 final review (diff 0efaa0f): PASS, 0 blocker/high, 2 findings —
+  MEDIUM invalid-dims refusal semantics unpinned at the process seam (fixed:
+  refusal semantics documented on RuntimeTerminalDimensions + adapter test
+  pinning inert pass-through); LOW submodule pin bundles the disclosed WC-005
+  TTY fix (accepted: dual-contract documented, full suite incl. WC-005 legs
+  green on pin 210d50d). Transcript ~/.hermes/cache/delegation/live/deleg_11f42e7d/task-0.log.
