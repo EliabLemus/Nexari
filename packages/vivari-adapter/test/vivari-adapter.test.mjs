@@ -577,6 +577,38 @@ test('rejects a relative mountPoint before it reaches the owned Vivari mount sea
   await runtime.teardown();
 });
 
+test('spawn forwards terminal dimensions and the tracked process resizes through the guest seam', async () => {
+  const fake = fakeSdk();
+  let guestResize;
+  let guestSpawnOptions;
+  fake.instance.spawn = async (_command, _args, options) => {
+    guestSpawnOptions = options;
+    guestResize = (dimensions) => { fake.calls.resize = dimensions; };
+    return { pid: 41, output: stream, stdout: stream, stderr: stream, input: new WritableStream(), exit: Promise.resolve(0), kill() {}, resize: guestResize };
+  };
+  const runtime = createVivariRuntime({ id: 'terminal-resize', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const process = await runtime.spawn('node', ['probe.js'], { terminal: { columns: 80, rows: 24 } });
+  assert.deepEqual(guestSpawnOptions.terminal, { columns: 80, rows: 24 }, 'the adapter must forward initial terminal dimensions to the owned guest seam');
+  process.resize({ columns: 100, rows: 30 });
+  assert.deepEqual(fake.calls.resize, { columns: 100, rows: 30 }, 'the tracked process must forward resize calls to the owned guest seam');
+  await runtime.teardown();
+});
+
+test('resize fails closed with a typed UNSUPPORTED_CAPABILITY error when the pinned guest lacks resize', async () => {
+  const fake = fakeSdk();
+  fake.instance.spawn = async () => ({ pid: 41, output: stream, stdout: stream, stderr: stream, input: new WritableStream(), exit: Promise.resolve(0), kill() {} });
+  const runtime = createVivariRuntime({ id: 'legacy-guest-resize', isIsolated: () => true, loadSdk: fake.loader });
+  await runtime.boot();
+  const process = await runtime.spawn('node', ['probe.js']);
+  assert.throws(
+    () => process.resize({ columns: 100, rows: 30 }),
+    (error) => error instanceof RuntimeError && error.code === 'UNSUPPORTED_CAPABILITY',
+    'an older pinned core without a resize method must surface a typed UNSUPPORTED_CAPABILITY failure, not a TypeError',
+  );
+  await runtime.teardown();
+});
+
 test('teardown clears an attached preview source so a stale document cannot outlive the runtime', async () => {
   const fake = fakeSdk();
   const preview = {

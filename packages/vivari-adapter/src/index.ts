@@ -10,6 +10,7 @@ import {
   type RuntimeFsWatcher,
   type RuntimeProcess,
   type RuntimeEventMap,
+  type RuntimeTerminalDimensions,
 } from '../../runtime-contract/dist/index.js';
 
 export interface VivariLike {
@@ -24,7 +25,11 @@ export interface VivariLike {
     watch(path: string, listener?: (event: RuntimeFsChangeEvent) => void): RuntimeFsWatcher;
   };
   mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void>;
-  spawn(command: string, args?: string[], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess>;
+  spawn(
+    command: string,
+    args?: string[],
+    options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal; terminal?: RuntimeTerminalDimensions },
+  ): Promise<RuntimeProcess>;
   attachPreview(iframe: HTMLIFrameElement): () => void | PromiseLike<void>;
   on(event: 'server-ready', listener: (port: number, url: string) => void): () => void | PromiseLike<void>;
   on(event: 'port', listener: (port: number, kind: 'open' | 'close', url: string) => void): () => void | PromiseLike<void>;
@@ -377,7 +382,11 @@ class NexariVivariRuntime implements BrowserRuntime {
     }
   }
 
-  async spawn(command: string, args: string[] = [], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess> {
+  async spawn(
+    command: string,
+    args: string[] = [],
+    options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal; terminal?: RuntimeTerminalDimensions },
+  ): Promise<RuntimeProcess> {
     try {
       const instance = this.#ready();
       if (options?.signal?.aborted) throw options.signal.reason;
@@ -418,6 +427,14 @@ class NexariVivariRuntime implements BrowserRuntime {
           if (killed) return;
           process.kill();
           killed = true;
+        },
+        resize: (dimensions: RuntimeTerminalDimensions) => {
+          if (typeof process.resize !== 'function') {
+            // An older pinned core predating live resize must fail closed with
+            // a typed capability error, not an opaque TypeError.
+            throw new RuntimeError('UNSUPPORTED_CAPABILITY', 'The pinned Vivari core predates live terminal resize');
+          }
+          process.resize(dimensions);
         },
       };
       this.#processes.add(trackedProcess);

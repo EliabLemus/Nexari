@@ -34,6 +34,33 @@ export interface RuntimeProcess {
   readonly input: WritableStream<string>;
   readonly exit: Promise<number>;
   kill(): void;
+  /**
+   * Resize the attached terminal (initial dimensions come from
+   * RuntimeSpawnOptions.terminal). The owned runtime refuses invalid dimensions
+   * and dead pids, so a stale resize is inert. Demands a real-browser citation:
+   * e2e/browser-smoke.e2e.mjs — wc006ResizeProof (guest SIGWINCH ack at
+   * 100x30) must exist before hosts call this API.
+   */
+  resize(dimensions: RuntimeTerminalDimensions): void;
+}
+
+/** Initial or updated dimensions for an experimental interactive terminal. */
+export interface RuntimeTerminalDimensions {
+  columns: number;
+  rows: number;
+}
+
+export interface RuntimeSpawnOptions {
+  cwd?: string;
+  env?: Record<string, string>;
+  signal?: AbortSignal;
+  /**
+   * Attach an experimental interactive terminal with these initial dimensions;
+   * the guest reads them on process.stdout.columns/rows. Demands a real-browser
+   * citation: e2e/browser-smoke.e2e.mjs — wc006TtyDimsProof (guest probe
+   * observes 80x24 at spawn) must exist before hosts pass this option.
+   */
+  terminal?: RuntimeTerminalDimensions;
 }
 
 export type RuntimeEventMap = {
