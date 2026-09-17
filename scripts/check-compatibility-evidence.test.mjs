@@ -40,21 +40,34 @@ test('BOLT-WC-005 is only marked proven with the positive browser shell proof, a
   );
 });
 
-test('BOLT-WC-006 remains blocked on cols/rows resize while its interactive-shell stdin, merged-output and kill legs are browser-proven on the guest REPL', async () => {
+test('BOLT-WC-006 is only marked proven with the browser resize proof alongside its interactive-shell stdin, merged-output and kill legs', async () => {
   const matrix = await readFile(matrixUrl, 'utf8');
   assert.match(
     matrix,
-    /^\| BOLT-WC-006 \| must-have \| terminal: Interactive shell process exposes input, merged output, terminal cols\/rows, resize and kill\. \| app\/utils\/shell\.ts:11-87; app\/lib\/stores\/terminal\.ts:50-61 \| e2e\/browser-smoke\.e2e\.mjs \(interactive guest `sh` REPL driven over streams: prompt-synced open-stdin keystrokes with echo-safe split markers, merged output with stream-tagged stderr from a nested one-shot shell, kill and closed merged stream; explicit `interactive_terminal: unsupported` capability\) \| blocked \(interactive-shell stdin, merged output and kill are browser-proven on the guest `sh` REPL over streams — no pty is involved and the `interactive_terminal` capability stays unsupported; remaining gap: terminal cols\/rows and resize only, structurally absent per scoped audit: runtime contract lacks resize, core spawn options lack terminal dimensions, syscall protocol lacks SIGWINCH or TIOCSWINSZ\) \|$/m,
-    'BOLT-WC-006 may only narrow its blocked rationale once interactive-shell stdin, merged output and kill are proven in a real browser over the owned runtime, and it must stay blocked while resize remains structurally absent',
+    /^\| BOLT-WC-006 \| must-have \| terminal: Interactive shell process exposes input, merged output, terminal cols\/rows, resize and kill\. \| app\/utils\/shell\.ts:11-87; app\/lib\/stores\/terminal\.ts:50-61 \| e2e\/browser-smoke\.e2e\.mjs \(interactive guest `sh` REPL driven over streams: prompt-synced open-stdin keystrokes with echo-safe split markers, merged output with stream-tagged stderr from a nested one-shot shell, kill and closed merged stream; guest `node` probe asserting terminal dims 80x24 and a live `resize` to 100x30 acknowledged by a guest SIGWINCH handler; `interactive_terminal: experimental` capability\) \| proven \(all five legs browser-proven over the owned runtime: interactive-shell stdin, merged output with stream-tagged stderr, terminal cols\/rows at spawn, live resize acknowledged through SIGWINCH, and kill closing the merged stream; capability disclosed as `interactive_terminal: experimental`\) \|$/m,
+    'BOLT-WC-006 may only leave the compatibility gate once every leg — stdin, merged output, cols/rows, resize and kill — is proven in a real browser over the owned runtime',
   );
 });
 
-test('BOLT-WC-006 structural audit: named declaration seams still expose no resize, dimensions or SIGWINCH primitive', async () => {
+test('BOLT-WC-006 structural audit: contract and core seams carry terminal dimensions only with adjacent browser-proof references', async () => {
   const contractSource = await readFile(new URL('../packages/runtime-contract/src/index.ts', import.meta.url), 'utf8');
   const runtimeSpawnOptions = await readFile(new URL('../runtime/vivari/packages/core/src/types.ts', import.meta.url), 'utf8');
   const runtimeProtocol = await readFile(new URL('../runtime/vivari/packages/protocol/syscall.js', import.meta.url), 'utf8');
-  assert.doesNotMatch(contractSource, /\b(?:resize|setWindowSize)\s*\??\s*[:(]/, 'the runtime contract gained a resize primitive: prove terminal resize in a real browser against the owned runtime before relaxing the BOLT-WC-006 blocked row or this audit');
-  assert.doesNotMatch(runtimeSpawnOptions, /\b(?:terminal|columns|rows|pty|winsize)\s*\??\s*:/i, 'the owned runtime spawn options gained terminal dimensions: prove them in a real browser before relaxing the BOLT-WC-006 blocked row or this audit');
+  assert.match(
+    contractSource,
+    /resize\s*\??\s*[(:]|resize\s*\([^)]*\)\s*:\s*void[\s\S]{0,200}wc006ResizeProof/,
+    'the runtime contract resize primitive must cite the browser resize proof (wc006ResizeProof) in an adjacent doc comment, or the BOLT-WC-006 browser evidence is missing',
+  );
+  assert.match(
+    contractSource,
+    /terminal\??:\s*RuntimeTerminalDimensions[\s\S]{0,200}wc006TtyDimsProof/,
+    'the runtime contract terminal spawn option must cite the browser tty-dims proof (wc006TtyDimsProof) in an adjacent doc comment, or the BOLT-WC-006 browser evidence is missing',
+  );
+  assert.match(
+    runtimeSpawnOptions,
+    /terminal\??:\s*\{[\s\S]{0,120}columns[\s\S]{0,120}\}[\s\S]{0,200}wc006TtyDimsProof/,
+    'the owned runtime spawn options gained terminal dimensions: they must cite the browser tty-dims proof (wc006TtyDimsProof) in an adjacent doc comment',
+  );
   assert.doesNotMatch(runtimeProtocol, /\b(?:SIGWINCH|TIOCSWINSZ)\b/i, 'the owned runtime signal protocol gained a guest-visible resize primitive: prove terminal resize in a real browser against the owned runtime before relaxing the BOLT-WC-006 blocked row or this audit');
 });
 
