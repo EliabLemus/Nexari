@@ -68,6 +68,16 @@ test('BOLT-WC-006 structural audit: contract and core seams carry terminal dimen
     /terminal\??:\s*\{[\s\S]{0,120}columns[\s\S]{0,120}\}[\s\S]{0,200}wc006TtyDimsProof/,
     'the owned runtime spawn options gained terminal dimensions: they must cite the browser tty-dims proof (wc006TtyDimsProof) in an adjacent doc comment',
   );
+  // The SDK spawn seam must state its TTY intent explicitly: pipes unless the
+  // spawner attached a terminal. Browser-proven 2026-09-16 — inheriting the
+  // kernel-harness tty=!capture default made real npm boot with isTTY:true and
+  // swallow its script phase (BOLT-WC-005 regression). kernel.start()'s
+  // separate uncaptured-spawn terminal default stays untouched by design.
+  assert.match(
+    runtimeSpawnOptions,
+    /TTY default \(dual contract[\s\S]{0,400}intentionally different seams/,
+    'the owned runtime terminal option must document the dual TTY-default contract (SDK pipes-by-default vs kernel.start() harness) so the seams cannot silently reunify',
+  );
   assert.doesNotMatch(runtimeProtocol, /\b(?:SIGWINCH|TIOCSWINSZ)\b/i, 'the owned runtime signal protocol gained a guest-visible resize primitive: prove terminal resize in a real browser against the owned runtime before relaxing the BOLT-WC-006 blocked row or this audit');
 });
 
