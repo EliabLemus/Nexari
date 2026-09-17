@@ -16,7 +16,7 @@ const requiredNeedles = [
   'Disposition: not adopted; migration candidate only.',
 ];
 const narrowClaim = 'does not claim that BOLT-WC-005 or BOLT-WC-006 is compatible, and it cannot change either status without the required real Chrome proof';
-const prohibitedCapabilityPromotion = /BOLT-WC-00[56][^\n]{0,100}\b(?:compatible|proven|passes|pass)\b|\b(?:promotes?|proves?)\s+BOLT-WC-00[56]/i;
+const prohibitedCapabilityPromotion = /BOLT-WC-00[56][^\n]{0,100}\b(?:compatible|proven|passes?)\b|\b(?:compatible|proven|passes?)\b[^\n]{0,100}BOLT-WC-00[56]|\b(?:promotes?|proves?)\s+BOLT-WC-00[56]/i;
 
 export function validateUpstreamVivari100Ledger(text) {
   for (const needle of requiredNeedles) {

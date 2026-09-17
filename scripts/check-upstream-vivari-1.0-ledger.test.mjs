@@ -36,6 +36,13 @@ test('rejects a compatibility promotion even when the required disclaimer remain
   );
 });
 
+test('rejects a reversed-order compatibility claim about BOLT-WC-005 or BOLT-WC-006', () => {
+  assert.throws(
+    () => validateUpstreamVivari100Ledger(`${validLedger}\nThe candidate runtime is compatible with BOLT-WC-006.`),
+    /unproven BOLT-WC capability promotion/,
+  );
+});
+
 test('reads the candidate license by the resolved pinned SHA, never through the mutable tag again', async () => {
   const calls = [];
   await validatePinnedCandidate(async (...args) => {
