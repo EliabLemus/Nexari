@@ -159,13 +159,13 @@ try {
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.capabilitiesProof`),
-    'native_addons-docker-tcp_remote-udp-ssh-linux_binary-permission_changes-symlinks-interactive_terminal-text_search-unsupported-filesystem_watch-experimental',
-    'the browser lab must explicitly disclose unsupported native, permission-change, symlink and interactive-terminal capabilities while filesystem watching remains experimental',
+    'native_addons-docker-tcp_remote-udp-ssh-linux_binary-permission_changes-symlinks-text_search-unsupported-interactive_terminal-experimental-filesystem_watch-experimental',
+    'the browser lab must explicitly disclose unsupported native, permission-change and symlink capabilities while interactive terminal and filesystem watching remain experimental',
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.interactiveTerminalCapabilityProof`),
-    'unsupported',
-    'the browser lab must explicitly disclose that an interactive terminal is unavailable until browser support is proven',
+    'experimental',
+    'the browser lab must disclose the interactive terminal as experimental only once its browser terminal proof passes',
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.stdinProof`),
@@ -216,6 +216,16 @@ try {
     await evaluate(`document.querySelector('#status')?.dataset.wc006InteractiveKillProof`),
     'killed-exited-merged-closed',
     'a killed interactive shell must settle a numeric exit and close its merged output stream',
+  );
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.wc006TtyDimsProof`),
+    'spawn-terminal-80x24',
+    'a real guest node process must observe its 80x24 spawn terminal on the runtime streams before any resize',
+  );
+  assert.equal(
+    await evaluate(`document.querySelector('#status')?.dataset.wc006ResizeProof`),
+    'sigwinch-ack-100x30',
+    'a live resize to 100x30 must be acknowledged by the guest node process through its SIGWINCH handler',
   );
   assert.match(
     await evaluate(`document.querySelector('#status')?.dataset.portOpen`),

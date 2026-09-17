@@ -26,6 +26,12 @@ const project = {
   'process-options.js': { file: { contents: [
     "process.stdout.write(JSON.stringify({ cwd: process.cwd(), option: process.env.NEXARI_PROCESS_OPTION, args: process.argv.slice(2) }));",
   ].join('\n') } },
+  'tty-probe.js': { file: { contents: [
+    "process.stdout.write(JSON.stringify({ tty: process.stdout.isTTY === true, cols: process.stdout.columns, rows: process.stdout.rows }));",
+    "process.on('SIGWINCH', () => process.stdout.write(JSON.stringify({ winch: true, cols: process.stdout.columns, rows: process.stdout.rows })));",
+    "let seq = 0;",
+    "setInterval(() => { seq += 1; process.stdout.write(JSON.stringify({ seq })); }, 60);",
+  ].join('\n') } },
   'package.json': { file: { contents: JSON.stringify({
     name: 'nexari-browser-smoke-fixture',
     private: true,
@@ -118,14 +124,20 @@ async function bootRuntime() {
   await runtime.boot({ previewOrigin });
   status.dataset.selfHostedPreviewOriginProof = previewOrigin;
   const capabilities = runtime.getCapabilities();
-  const unsupportedCapabilityNames = ['native_addons', 'docker', 'tcp_remote', 'udp', 'ssh', 'linux_binary', 'permission_changes', 'symlinks', 'interactive_terminal', 'text_search'] as const;
+  // `interactive_terminal` is experimental: the terminal-dimension and live
+  // resize surface below carries its browser proof. Everything else in this
+  // list stays unsupported until a browser proof exists.
+  const unsupportedCapabilityNames = ['native_addons', 'docker', 'tcp_remote', 'udp', 'ssh', 'linux_binary', 'permission_changes', 'symlinks', 'text_search'] as const;
   if (unsupportedCapabilityNames.some((name) => capabilities[name] !== 'unsupported')) {
     throw new Error('Vivari browser-runtime limitations must be explicitly unsupported');
   }
   if (capabilities.filesystem_watch !== 'experimental') {
     throw new Error('Vivari filesystem watching must be explicitly experimental until its browser proof passes');
   }
-  status.dataset.capabilitiesProof = `${unsupportedCapabilityNames.join('-')}-unsupported-filesystem_watch-experimental`;
+  if (capabilities.interactive_terminal !== 'experimental') {
+    throw new Error('Vivari interactive terminal must stay experimental until its browser terminal-dimension and resize proof passes');
+  }
+  status.dataset.capabilitiesProof = `${unsupportedCapabilityNames.join('-')}-unsupported-interactive_terminal-experimental-filesystem_watch-experimental`;
   runtime.attachPreview(preview);
   await runtime.mount(project);
   const instanceMarkerPath = 'nexari-runtime-instance-marker.txt';
@@ -351,10 +363,52 @@ async function bootRuntime() {
     throw new Error('Vivari interactive merged output stream never closed after kill');
   }
   status.dataset.wc006InteractiveKillProof = 'killed-exited-merged-closed';
-  if (capabilities.interactive_terminal !== 'unsupported') {
-    throw new Error('Vivari interactive terminal support must remain explicitly unavailable until a browser proof exists');
+  // BOLT-WC-006 final legs: terminal dimensions at spawn and live resize,
+  // proven against the owned runtime by a dedicated guest `node` probe —
+  // never the REPL, and never after a kill leg (Challenger ordering finding).
+  const ttyProbe = await runtime.spawn('node', ['tty-probe.js'], { terminal: { columns: 80, rows: 24 } });
+  let ttyMerged = '';
+  void (async () => {
+    try {
+      for await (const chunk of ttyProbe.output) ttyMerged += chunk;
+    } catch {
+      // A faulted stream still ends the merged view.
+    }
+  })();
+  try {
+    // Dimensions BEFORE resize: the live guest must observe its spawn-time
+    // 80x24 terminal on the real stdout streams (wc006TtyDimsProof).
+    const dimsObserved = await waitFor(() => /\{"tty":true,"cols":80,"rows":24\}/.test(ttyMerged), 15_000);
+    if (!dimsObserved) {
+      throw new Error(`Vivari guest node probe never observed its 80x24 spawn terminal: ${ttyMerged}`);
+    }
+    status.dataset.wc006TtyDimsProof = 'spawn-terminal-80x24';
+    // Live resize: the host moves the terminal to 100x30 and the guest's
+    // SIGWINCH handler acknowledges the NEW dimensions — dims are applied
+    // before the event, coalesced like Unix pending signals (wc006ResizeProof).
+    ttyProbe.resize({ columns: 100, rows: 30 });
+    const resizeAcked = await waitFor(() => /\{"winch":true,"cols":100,"rows":30\}/.test(ttyMerged), 15_000);
+    if (!resizeAcked) {
+      throw new Error(`Vivari guest node probe never acknowledged the live 100x30 resize through SIGWINCH: ${ttyMerged}`);
+    }
+    status.dataset.wc006ResizeProof = 'sigwinch-ack-100x30';
+  } finally {
+    ttyProbe.kill();
+    const probeExit = await Promise.race([
+      ttyProbe.exit,
+      new Promise<never>((_, reject) => setTimeout(
+        () => reject(new Error('Vivari tty probe never settled its exit after kill')),
+        15_000,
+      )),
+    ]);
+    if (!Number.isInteger(probeExit)) {
+      throw new Error(`Vivari tty probe reported a non-integer exit: ${probeExit}`);
+    }
   }
-  status.dataset.interactiveTerminalCapabilityProof = 'unsupported';
+  if (capabilities.interactive_terminal !== 'experimental') {
+    throw new Error('Vivari interactive terminal must be disclosed as experimental once its browser terminal proof passes');
+  }
+  status.dataset.interactiveTerminalCapabilityProof = 'experimental';
   if (runtime.workdir !== '/' || observedProcessOptions.cwd !== runtime.workdir) {
     throw new Error('Vivari stable workdir proof failed');
   }

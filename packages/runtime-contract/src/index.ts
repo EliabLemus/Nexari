@@ -60,7 +60,7 @@ export interface RuntimeSpawnOptions {
    * citation: e2e/browser-smoke.e2e.mjs — wc006TtyDimsProof (guest probe
    * observes 80x24 at spawn) must exist before hosts pass this option.
    */
-  terminal?: RuntimeTerminalDimensions;
+  terminal?: RuntimeTerminalDimensions; // browser proof: wc006TtyDimsProof (guest probe observes 80x24 at spawn)
 }
 
 export type RuntimeEventMap = {
@@ -93,7 +93,7 @@ export interface BrowserRuntime {
   readonly fs: RuntimeFileSystem;
   boot(options?: RuntimeBootOptions): Promise<void>;
   mount(tree: unknown, options?: { mountPoint?: string; signal?: AbortSignal }): Promise<void>;
-  spawn(command: string, args?: string[], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal }): Promise<RuntimeProcess>;
+  spawn(command: string, args?: string[], options?: { cwd?: string; env?: Record<string, string>; signal?: AbortSignal; terminal?: RuntimeTerminalDimensions }): Promise<RuntimeProcess>;
   attachPreview(iframe: HTMLIFrameElement): () => void | PromiseLike<void>;
   on<E extends keyof RuntimeEventMap>(event: E, listener: (...args: RuntimeEventMap[E]) => void): () => void;
   export(path?: string): Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>;
