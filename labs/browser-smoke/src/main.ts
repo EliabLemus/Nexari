@@ -525,6 +525,24 @@ async function waitFor(check: () => boolean, timeoutMs = 5_000): Promise<boolean
   return false;
 }
 
+async function assertTerminatedOperation(operation: Promise<unknown>, label: string) {
+  try {
+    await operation;
+    throw new Error(`Vivari adapter accepted ${label} after termination`);
+  } catch (error) {
+    if (!(error instanceof Error) || (error as { code?: unknown }).code !== 'TORN_DOWN') {
+      throw error;
+    }
+  }
+}
+
+async function proveTerminatedLifecycle(runtime: ReturnType<typeof createVivariRuntime>) {
+  await runtime.teardown();
+  await assertTerminatedOperation(runtime.boot(), 'boot');
+  await assertTerminatedOperation(runtime.fs.writeFile('/nexari-after-teardown.txt', 'blocked'), 'fs.writeFile');
+  await assertTerminatedOperation(runtime.spawn('node', ['server.js']), 'spawn');
+}
+
 teardownButton.addEventListener('click', async () => {
   const runtime = activeRuntime;
   if (!runtime) return;
@@ -545,6 +563,14 @@ teardownButton.addEventListener('click', async () => {
   delete status.dataset.runtimeId;
   status.dataset.state = 'terminated';
   status.textContent = 'Runtime terminated; preview detached';
+  try {
+    await proveTerminatedLifecycle(runtime);
+    status.dataset.terminatedLifecycleProof = 'repeat-teardown-boot-fs-spawn-torn-down';
+  } catch (error) {
+    status.dataset.state = 'failed';
+    status.textContent = `Terminated lifecycle proof failed: ${error instanceof Error ? error.message : String(error)}`;
+    return;
+  }
   rebootButton.disabled = false;
 });
 

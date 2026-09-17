@@ -290,6 +290,9 @@ try {
   const outputClosed = await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.outputClosed === 'true'`));
   assert.equal(outputClosed, true, 'teardown must close process output so terminal consumers cannot hang');
 
+  const terminatedLifecycleProof = await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.terminatedLifecycleProof === 'repeat-teardown-boot-fs-spawn-torn-down'`), 10_000);
+  assert.equal(terminatedLifecycleProof, true, 'repeat teardown must resolve idempotently and boot, filesystem writes and spawn must reject typed TORN_DOWN after termination');
+
   assert.equal(await evaluate(`document.querySelector('#reboot')?.disabled`), false, 'a terminated runtime must allow the lab host to create a fresh isolated runtime');
   await evaluate(`document.querySelector('#reboot')?.click()`);
   const rebooted = await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.state === 'ready'`), 120_000);
