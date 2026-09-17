@@ -64,6 +64,8 @@ test('rejects any NEXARI_CHROME_CDP_URL assignment; the browser lab runner owns 
     '        env:\n          NEXARI_CHROME_CDP_URL: http://127.0.0.1:9222',
     '        env:\n          NEXARI_CHROME_CDP_URL: http://localhost:9222',
     '        env:\n          NEXARI_CHROME_CDP_URL: http://example.invalid:9222',
+    '        run: export NEXARI_CHROME_CDP_URL=http://127.0.0.1:9222 && npm run test:browser-lab',
+    '        run: NEXARI_CHROME_CDP_URL=http://127.0.0.1:9222 npm run test:browser-lab',
   ]) {
     assert.throws(() => assertNoWorkflowCdpAssignment(forbidden), /must not assign NEXARI_CHROME_CDP_URL/);
   }

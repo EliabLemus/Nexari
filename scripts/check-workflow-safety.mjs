@@ -11,7 +11,9 @@ const CHROME_PIN = /^\s*NEXARI_CHROME_BIN:\s*\/\S*chrome\S*\s*$/i;
 // The browser lab runner spawns and owns its own loopback-only Chrome with a
 // fresh profile; workflows must never hand the E2E child a pre-chosen CDP
 // endpoint (even a loopback one, which would bypass ephemeral-port ownership).
-const WORKFLOW_CDP_ASSIGNMENT = /(?:^|\s)NEXARI_CHROME_CDP_URL\s*:/;
+// Covers YAML mapping (`NEXARI_CHROME_CDP_URL:`) and shell assignment
+// (`NEXARI_CHROME_CDP_URL=`, `export NEXARI_CHROME_CDP_URL=`) forms.
+const WORKFLOW_CDP_ASSIGNMENT = /(?:^|\s)NEXARI_CHROME_CDP_URL\s*(?::|=)/;
 
 export function assertNoNpmPublication(workflowContents) {
   if (FORBIDDEN_NPM_PUBLICATION.test(workflowContents)) {
