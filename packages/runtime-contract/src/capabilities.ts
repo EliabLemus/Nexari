@@ -25,7 +25,12 @@ export function unsupportedCapabilities(): RuntimeCapabilities {
     permission_changes: 'unsupported',
     symlinks: 'unsupported',
     filesystem_watch: 'experimental',
-    interactive_terminal: 'unsupported',
+    // Browser-proven against the owned runtime in a real isolated Chrome lab
+    // (e2e/browser-smoke.e2e.mjs — wc006TtyDimsProof + wc006ResizeProof): a
+    // guest node probe reads initial terminal dims at spawn and acknowledges a
+    // live resize through a SIGWINCH handler. Experimental, not supported: no
+    // full pty surface yet — stdin/merged output/dims/resize/kill only.
+    interactive_terminal: 'experimental',
     text_search: 'unsupported',
   };
 }

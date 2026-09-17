@@ -45,7 +45,7 @@ test('lifecycle only permits idempotent teardown after termination', () => {
   assert.throws(() => lifecycle.beginBoot(), (error) => error instanceof RuntimeError && error.code === 'TORN_DOWN');
 });
 
-test('browser-runtime capabilities explicitly disclose the experimental filesystem watcher', () => {
+test('browser-runtime capabilities disclose experimental filesystem watching and experimental interactive terminal', () => {
   assert.deepEqual(unsupportedCapabilities(), {
     native_addons: 'unsupported',
     docker: 'unsupported',
@@ -56,7 +56,7 @@ test('browser-runtime capabilities explicitly disclose the experimental filesyst
     permission_changes: 'unsupported',
     symlinks: 'unsupported',
     filesystem_watch: 'experimental',
-    interactive_terminal: 'unsupported',
+    interactive_terminal: 'experimental',
     text_search: 'unsupported',
   });
 });
