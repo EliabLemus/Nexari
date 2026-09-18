@@ -7,5 +7,6 @@ test-results/
 .env.*
 !.env.example
 .DS_Store
+.worktrees/
 runtime/vivari/node_modules/
 runtime/vivari/dist/
