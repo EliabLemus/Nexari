@@ -13,8 +13,8 @@
       "category": "boot",
       "statement": "WebContainer.boot accepts coep credentialless, workdirName and forwardPreviewErrors.",
       "bolt_source": "app/lib/webcontainer/index.ts:26-30",
-      "proof": "e2e/boot-options.spec.ts",
-      "nexari_status": "unknown"
+      "proof": "e2e/browser-smoke.e2e.mjs (actual browser adapter accepts `coep: 'credentialless'`; `workdirName` and `forwardPreviewErrors` reject explicitly before SDK load)",
+      "nexari_status": "blocked (credentialless proven; `workdirName` and `forwardPreviewErrors` explicitly unsupported)"
     },
     {
       "id": "BOLT-WC-002",
@@ -23,7 +23,7 @@
       "statement": "Runtime accepts preview script injection and emits preview diagnostics to the host.",
       "bolt_source": "app/lib/webcontainer/index.ts:37-57",
       "proof": "e2e/preview-diagnostics.spec.ts",
-      "nexari_status": "unknown"
+      "nexari_status": "blocked (preview script injection and preview diagnostics are unsupported; `forwardPreviewErrors` rejects before SDK load)"
     },
     {
       "id": "BOLT-WC-003",
@@ -31,8 +31,8 @@
       "category": "filesystem",
       "statement": "Filesystem supports readFile, writeFile, mkdir, readdir and rm with text and binary payloads.",
       "bolt_source": "app/lib/stores/files.ts:554-888; app/lib/hooks/useGit.ts:191-311",
-      "proof": "e2e/filesystem-crud.spec.ts",
-      "nexari_status": "unknown"
+      "proof": "e2e/browser-smoke.e2e.mjs (text CRUD, byte-exact binary read/write and nested recursive directory lifecycle)",
+      "nexari_status": "proven"
     },
     {
       "id": "BOLT-WC-004",
@@ -40,8 +40,8 @@
       "category": "workdir",
       "statement": "Runtime exposes a stable workdir used for path translation by actions, persistence and git.",
       "bolt_source": "app/lib/runtime/action-runner.ts:317-466; app/lib/hooks/useGit.ts:87-138",
-      "proof": "e2e/workdir.spec.ts",
-      "nexari_status": "unknown"
+      "proof": "e2e/browser-smoke.e2e.mjs (real guest process observes the adapter's stable root workdir)",
+      "nexari_status": "proven"
     },
     {
       "id": "BOLT-WC-005",
@@ -49,8 +49,8 @@
       "category": "spawn",
       "statement": "Runtime spawns node, npm and shell-like guest processes with arguments, cwd/env and observable exit.",
       "bolt_source": "app/lib/runtime/action-runner.ts:395; app/utils/shell.ts:7-89",
-      "proof": "e2e/process-spawn.spec.ts",
-      "nexari_status": "unknown"
+      "proof": "e2e/browser-smoke.e2e.mjs (real node, lazy-loaded vendored npm cwd/env/args/exit and guest `sh` printf: quoted format, exit 0, byte-exact stdout)",
+      "nexari_status": "proven (node, real vendored npm and the guest shell proven in the browser: `printf` with an explicit trailing-newline format exits 0 with byte-exact stdout; uninstalled commands still fail typed, `sh: seq: not found` + exit 127)"
     },
     {
       "id": "BOLT-WC-006",
@@ -58,17 +58,17 @@
       "category": "terminal",
       "statement": "Interactive shell process exposes input, merged output, terminal cols/rows, resize and kill.",
       "bolt_source": "app/utils/shell.ts:11-87; app/lib/stores/terminal.ts:50-61",
-      "proof": "e2e/interactive-terminal.spec.ts",
-      "nexari_status": "unknown"
+      "proof": "e2e/browser-smoke.e2e.mjs (interactive guest `sh` REPL driven over streams: prompt-synced open-stdin keystrokes with echo-safe split markers, merged output with stream-tagged stderr from a nested one-shot shell, kill and closed merged stream; guest `node` probe asserting terminal dims 80x24 and a live `resize` to 100x30 acknowledged by a guest SIGWINCH handler; `interactive_terminal: experimental` capability)",
+      "nexari_status": "proven (all five legs browser-proven over the owned runtime: interactive-shell stdin, merged output with stream-tagged stderr, terminal cols/rows at spawn, live resize acknowledged through SIGWINCH, and kill closing the merged stream; capability disclosed as `interactive_terminal: experimental`)"
     },
     {
       "id": "BOLT-WC-007",
       "priority": "must-have",
       "category": "preview-events",
-      "statement": "Runtime emits raw port state and server-ready only after a usable preview response.",
-      "bolt_source": "app/lib/stores/previews.ts:169-208",
-      "proof": "e2e/preview-readiness.spec.ts",
-      "nexari_status": "unknown"
+      "statement": "Runtime emits raw port state and exposes preview only after the host has observed a usable server response.",
+      "bolt_source": "app/lib/stores/previews.ts:169-208; lab host: labs/browser-smoke/src/main.ts",
+      "proof": "e2e/browser-smoke.e2e.mjs (port state, server-ready, response-before-preview)",
+      "nexari_status": "proven"
     },
     {
       "id": "BOLT-WC-008",
@@ -76,8 +76,8 @@
       "category": "preview-routing",
       "statement": "Host can attach a preview and cleanly detach stale routes on teardown.",
       "bolt_source": "app/components/workbench/Preview.tsx:380-399; app/lib/stores/previews.ts:211-254",
-      "proof": "e2e/preview-lifecycle.spec.ts",
-      "nexari_status": "unknown"
+      "proof": "e2e/browser-smoke.e2e.mjs (attached iframe source cleared and hidden; port close; prior preview route no longer serves its response)",
+      "nexari_status": "proven"
     },
     {
       "id": "BOLT-WC-009",
@@ -85,8 +85,8 @@
       "category": "watching",
       "statement": "Runtime exposes a path-watch capability suitable for host file synchronisation.",
       "bolt_source": "app/lib/stores/files.ts:593-605",
-      "proof": "e2e/filesystem-watch.spec.ts",
-      "nexari_status": "unknown"
+      "proof": "e2e/browser-smoke.e2e.mjs (path watch, event and close)",
+      "nexari_status": "proven (experimental)"
     },
     {
       "id": "BOLT-WC-010",
@@ -94,8 +94,8 @@
       "category": "search",
       "statement": "Runtime supports host-scoped text search or reports it unsupported explicitly.",
       "bolt_source": "app/components/workbench/Search.tsx:17-23,129",
-      "proof": "e2e/text-search-capability.spec.ts",
-      "nexari_status": "unknown"
+      "proof": "e2e/browser-smoke.e2e.mjs (browser capability disclosure)",
+      "nexari_status": "proven (unsupported)"
     },
     {
       "id": "BOLT-WC-011",
@@ -103,8 +103,8 @@
       "category": "export",
       "statement": "Runtime can recursively enumerate project files for Git and deployment flows.",
       "bolt_source": "app/components/deploy/GitHubDeploy.client.tsx:86-149; app/components/deploy/NetlifyDeploy.client.tsx:84-149",
-      "proof": "e2e/project-export.spec.ts",
-      "nexari_status": "unknown"
+      "proof": "e2e/browser-smoke.e2e.mjs (nested project file exported byte-exact)",
+      "nexari_status": "proven"
     },
     {
       "id": "BOLT-WC-012",
@@ -112,8 +112,8 @@
       "category": "native-limits",
       "statement": "Native binaries, permission changes and symlinks are disclosed rather than implied.",
       "bolt_source": "app/lib/hooks/useGit.ts:358-374; app/lib/common/prompts/prompts.ts:18-41",
-      "proof": "e2e/unsupported-capabilities.spec.ts",
-      "nexari_status": "unknown"
+      "proof": "e2e/browser-smoke.e2e.mjs (browser capability disclosure: native binaries, permission changes and symlinks unsupported)",
+      "nexari_status": "proven (unsupported)"
     },
     {
       "id": "BOLT-WC-013",
@@ -121,8 +121,8 @@
       "category": "preview-url",
       "statement": "Preview URL is host-configurable and not assumed to use StackBlitz wildcard domains.",
       "bolt_source": "app/routes/webcontainer.preview.$id.tsx:66-88; app/components/workbench/Preview.tsx:380-399",
-      "proof": "e2e/self-hosted-preview-url.spec.ts",
-      "nexari_status": "unknown"
+      "proof": "e2e/browser-smoke.e2e.mjs (controlled self-hosted origin is forwarded through the adapter; in-VM preview serves a 200 response on that origin)",
+      "nexari_status": "proven"
     },
     {
       "id": "BOLT-WC-014",
@@ -130,8 +130,8 @@
       "category": "isolation",
       "statement": "Missing required isolation must fail closed before a guest process launches.",
       "bolt_source": "Nexari requirement derived from public Vivari baseline and browser platform constraint",
-      "proof": "e2e/isolation-negative.spec.ts",
-      "nexari_status": "unknown"
+      "proof": "e2e/browser-smoke.e2e.mjs (isolated and non-isolated origins)",
+      "nexari_status": "proven"
     },
     {
       "id": "BOLT-WC-015",
@@ -139,8 +139,8 @@
       "category": "cancellation",
       "statement": "A package-manager process must expose kill/cancellation and terminal recovery after a stalled command.",
       "bolt_source": "Bolt issue #2043; app/lib/stores/terminal.ts:50-61",
-      "proof": "e2e/process-cancellation.spec.ts",
-      "nexari_status": "unknown"
+      "proof": "e2e/browser-smoke.e2e.mjs (real stalled-process cancellation, stream close and respawn)",
+      "nexari_status": "proven"
     },
     {
       "id": "BOLT-WC-016",
@@ -157,8 +157,8 @@
       "category": "browser-support",
       "statement": "Unsupported browser isolation states must be detectable and give a typed failure, not a blank preview.",
       "bolt_source": "Bolt issue #2070; app/lib/webcontainer/index.ts:21-30",
-      "proof": "e2e/browser-capability-negative.spec.ts",
-      "nexari_status": "unknown"
+      "proof": "e2e/browser-smoke.e2e.mjs (isolated and non-isolated origins; typed ISOLATION_REQUIRED failure before Vivari SDK load)",
+      "nexari_status": "proven"
     }
   ]
 }

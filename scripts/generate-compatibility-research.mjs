@@ -17,7 +17,7 @@ const requirements = [
   ['BOLT-WC-004', 'must-have', 'workdir', 'Runtime exposes a stable workdir used for path translation by actions, persistence and git.', 'app/lib/runtime/action-runner.ts:317-466; app/lib/hooks/useGit.ts:87-138', 'e2e/workdir.spec.ts'],
   ['BOLT-WC-005', 'must-have', 'spawn', 'Runtime spawns node, npm and shell-like guest processes with arguments, cwd/env and observable exit.', 'app/lib/runtime/action-runner.ts:395; app/utils/shell.ts:7-89', 'e2e/process-spawn.spec.ts'],
   ['BOLT-WC-006', 'must-have', 'terminal', 'Interactive shell process exposes input, merged output, terminal cols/rows, resize and kill.', 'app/utils/shell.ts:11-87; app/lib/stores/terminal.ts:50-61', 'e2e/interactive-terminal.spec.ts'],
-  ['BOLT-WC-007', 'must-have', 'preview-events', 'Runtime emits raw port state and server-ready only after a usable preview response.', 'app/lib/stores/previews.ts:169-208', 'e2e/preview-readiness.spec.ts'],
+  ['BOLT-WC-007', 'must-have', 'preview-events', 'Runtime emits raw port state and exposes preview only after the host has observed a usable server response.', 'app/lib/stores/previews.ts:169-208; lab host: labs/browser-smoke/src/main.ts', 'e2e/preview-readiness.spec.ts'],
   ['BOLT-WC-008', 'must-have', 'preview-routing', 'Host can attach a preview and cleanly detach stale routes on teardown.', 'app/components/workbench/Preview.tsx:380-399; app/lib/stores/previews.ts:211-254', 'e2e/preview-lifecycle.spec.ts'],
   ['BOLT-WC-009', 'must-have', 'watching', 'Runtime exposes a path-watch capability suitable for host file synchronisation.', 'app/lib/stores/files.ts:593-605', 'e2e/filesystem-watch.spec.ts'],
   ['BOLT-WC-010', 'should-have', 'search', 'Runtime supports host-scoped text search or reports it unsupported explicitly.', 'app/components/workbench/Search.tsx:17-23,129', 'e2e/text-search-capability.spec.ts'],
@@ -78,10 +78,39 @@ const triaged = rawIssues.issues.map((issue) => {
 if (triaged.length !== rawIssues.runtime_keyword_candidate_count) throw new Error('candidate count mismatch');
 const compatibilityDir = path.join(root, 'compatibility');
 await mkdir(compatibilityDir, { recursive: true });
+
+// The curated matrix is the source of truth for statuses and proofs. The
+// generator audits it against the pinned template and derives the generated
+// artifacts from it; it never rewrites the matrix itself.
+const matrixPath = path.join(compatibilityDir, 'bolt-compatibility-matrix.md');
+const curatedMatrix = await readFile(matrixPath, 'utf8');
+const template = new Map(requirements.map(([id, priority, category, statement, source]) => [id, { priority, category, statement, source }]));
+const curated = new Map();
+for (const line of curatedMatrix.split('\n')) {
+  const match = line.match(/^\| (BOLT-WC-\d{3}) \|/);
+  if (!match) continue;
+  const cells = line.split('|').slice(1, -1).map((cell) => cell.trim());
+  if (cells.length !== 6) throw new Error(`curated matrix row ${match[1]} does not have exactly 6 cells`);
+  const [id, priority, statement, boltSource, proof, status] = cells;
+  if (curated.has(id)) throw new Error(`curated matrix duplicates ${id}`);
+  if (!template.has(id)) throw new Error(`curated matrix carries unknown requirement ${id}`);
+  const expected = template.get(id);
+  if (priority !== expected.priority) throw new Error(`curated matrix ${id} priority drifted from the template`);
+  if (statement !== `${expected.category}: ${expected.statement}`) throw new Error(`curated matrix ${id} statement drifted from the template`);
+  if (boltSource !== expected.source) throw new Error(`curated matrix ${id} bolt evidence drifted from the template`);
+  if (!proof || !status) throw new Error(`curated matrix ${id} is missing proof or status`);
+  curated.set(id, { proof, status });
+}
+if (curated.size !== requirements.length) throw new Error(`curated matrix has ${curated.size} rows, template has ${requirements.length}`);
+
 const inventory = {
   schema_version: 1, generated_at: retrievedAt,
   source: { repository: 'https://github.com/stackblitz-labs/bolt.diy', commit: boltCommit, access: 'read-only local analysis clone' },
-  requirements: requirements.map(([id, priority, category, statement, bolt_source, proof]) => ({ id, priority, category, statement, bolt_source, proof, nexari_status: 'unknown' }))
+  requirements: requirements.map(([id]) => {
+    const expected = template.get(id);
+    const row = curated.get(id);
+    return { id, priority: expected.priority, category: expected.category, statement: expected.statement, bolt_source: expected.source, proof: row.proof, nexari_status: row.status };
+  })
 };
 await writeFile(path.join(compatibilityDir, 'bolt-webcontainers-inventory.json'), JSON.stringify(inventory, null, 2) + '\n');
 await writeFile(path.join(compatibilityDir, 'bolt-open-runtime-issues.json'), JSON.stringify({ schema_version: 1, source_repository: rawIssues.repository, retrieved_at: rawIssues.retrieved_at, open_issue_count: rawIssues.open_issue_count, runtime_keyword_candidate_count: triaged.length, triage: triaged }, null, 2) + '\n');
@@ -99,6 +128,4 @@ for (const [name, url, local, purpose] of publicFiles) {
 sourceRows.push({ name: 'Public @webcontainer/api package declaration', url: 'https://www.npmjs.com/package/@webcontainer/api/v/1.6.1-internal.1', retrieved_at: retrievedAt, sha256: null, bytes: null, allowed_claims: 'public package/version and public type/API contract only' });
 const ledger = `# StackBlitz public contract ledger\n\nThis is a clean-room source ledger. It permits observable API behavior, documented browser requirements and public package/type declarations. It explicitly forbids proprietary runtime binaries, hidden endpoints, obfuscated bundles and implementation extraction.\n\n| Source | Retrieval | Integrity | Allowed use |\n|---|---|---|---|\n${sourceRows.map((s) => `| [${s.name}](${s.url}) | ${s.retrieved_at} | ${s.sha256 ? `${s.sha256.slice(0, 16)}… (${s.bytes} bytes)` : 'package metadata recorded' } | ${s.allowed_claims} |`).join('\n')}\n\nPublic facts are translated into Nexari requirements only when combined with an observable host need and browser proof. The current Bolt-facing IDs are BOLT-WC-001 through BOLT-WC-017; see bolt-webcontainers-inventory.json.\n`;
 await writeFile(path.join(compatibilityDir, 'stackblitz-public-contract-ledger.md'), ledger);
-const matrix = `# Bolt.DIY → Nexari compatibility matrix\n\n**Bolt analysis input:** [stackblitz-labs/bolt.diy@${boltCommit}](https://github.com/stackblitz-labs/bolt.diy/tree/${boltCommit}) (read-only).\n\nA row is not compatible until its named browser test passes against Nexari's owned fork. All rows are intentionally unknown in the provenance milestone; no compatibility claim is made yet.\n\n| Requirement | Priority | Behavior | Bolt evidence | Required browser proof | Current status |\n|---|---|---|---|---|---|\n${requirements.map(([id, priority, category, statement, source, proof]) => `| ${id} | ${priority} | ${category}: ${statement} | ${source} | ${proof} | unknown |`).join('\n')}\n\n## Gate\n\nNo future Bolt integration can select Nexari until every must-have row is proven by its browser proof or the Human Owner records an explicit limitation decision.\n`;
-await writeFile(path.join(compatibilityDir, 'bolt-compatibility-matrix.md'), matrix);
 console.log(JSON.stringify({ requirements: requirements.length, triaged_issues: triaged.length, public_sources: sourceRows.length, output: compatibilityDir }));
