@@ -21,6 +21,16 @@ export interface RuntimeFsChangeEvent {
   path: string;
 }
 
+/** A same-origin preview failure forwarded only when boot opts into it. */
+export interface RuntimePreviewDiagnostic {
+  kind: 'error' | 'unhandledrejection';
+  message: string;
+  filename?: string;
+  line?: number;
+  column?: number;
+  stack?: string;
+}
+
 export interface RuntimeFsWatcher extends AsyncIterable<RuntimeFsChangeEvent> {
   close(): void;
   readonly closed: boolean;
@@ -75,6 +85,8 @@ export type RuntimeEventMap = {
   'fs-change': [event: RuntimeFsChangeEvent];
   /** An unrecoverable runtime failure surfaced by the owned guest. */
   'error': [error: Error];
+  /** Browser-preview error forwarded through the opt-in, origin-bound relay. */
+  'preview-error': [diagnostic: RuntimePreviewDiagnostic];
 };
 
 /**
@@ -87,7 +99,9 @@ export interface RuntimeBootOptions {
   /** Optional self-hosted origin that serves the runtime's preview routes. */
   previewOrigin?: string;
   coep?: 'credentialless';
+  /** Optional safe namespace label accepted for WebContainer call compatibility. */
   workdirName?: string;
+  /** Opt in to same-origin preview error and unhandled-rejection forwarding. */
   forwardPreviewErrors?: boolean;
 }
 

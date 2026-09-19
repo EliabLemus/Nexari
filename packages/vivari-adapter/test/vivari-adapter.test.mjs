@@ -98,16 +98,41 @@ test('accepts credentialless COEP without forwarding it to the owned Vivari boot
   await runtime.teardown();
 });
 
-test('rejects unsupported host boot options before loading the Vivari SDK and remains retryable', async () => {
+test('accepts WebContainer-compatible workdirName and forwardPreviewErrors without forwarding either option to Vivari', async () => {
+  const fake = fakeSdk();
+  let receivedOptions;
+  const runtime = createVivariRuntime({
+    id: 'webcontainer-compatible-boot-options',
+    isIsolated: () => true,
+    loadSdk: async () => ({ boot: async (options) => {
+      receivedOptions = options;
+      return fake.instance;
+    } }),
+  });
+  await runtime.boot({ workdirName: 'nexari-project', forwardPreviewErrors: true });
+  assert.equal(runtime.state, 'ready');
+  assert.equal(receivedOptions.workdirName, undefined);
+  assert.equal(receivedOptions.forwardPreviewErrors, undefined);
+  assert.equal(receivedOptions.signal instanceof AbortSignal, true);
+  await runtime.teardown();
+});
+
+test('rejects malformed WebContainer-compatible boot options before loading Vivari and remains retryable', async () => {
   for (const [option, value] of [
     ['coep', 'require-corp'],
-    ['workdirName', 'project'],
-    ['forwardPreviewErrors', true],
+    ['workdirName', ''],
+    ['workdirName', '.'],
+    ['workdirName', '..'],
+    ['workdirName', 'nested/project'],
+    ['workdirName', 'nested\\project'],
+    ['workdirName', 'control\u0000character'],
+    ['workdirName', 'a'.repeat(129)],
+    ['forwardPreviewErrors', 'true'],
   ]) {
     const fake = fakeSdk();
     let sdkLoads = 0;
     const runtime = createVivariRuntime({
-      id: `unsupported-boot-option-${option}`,
+      id: `invalid-boot-option-${option}`,
       isIsolated: () => true,
       loadSdk: async () => {
         sdkLoads++;
@@ -118,7 +143,7 @@ test('rejects unsupported host boot options before loading the Vivari SDK and re
       runtime.boot({ [option]: value }),
       (error) => error instanceof RuntimeError
         && error.code === 'UNSUPPORTED_CAPABILITY'
-        && error.message === `Unsupported boot option: ${option}`,
+        && error.message === `Invalid boot option: ${option}`,
     );
     assert.equal(sdkLoads, 0);
     assert.equal(runtime.state, 'created');
@@ -668,6 +693,61 @@ test('detaching a superseded preview attachment cannot clear a newer preview doc
   assert.equal(preview.src, '');
   assert.equal(preview.hidden, true);
   assert.equal(fake.calls.detach, 2);
+});
+
+test('preview diagnostics require opt-in and reject wrong origin, source, or nonce before detachment', async () => {
+  const savedWindow = globalThis.window;
+  const windowListeners = new Map();
+  const fakeWindow = {
+    addEventListener(type, listener) { windowListeners.set(type, listener); },
+    removeEventListener(type, listener) { if (windowListeners.get(type) === listener) windowListeners.delete(type); },
+  };
+  globalThis.window = fakeWindow;
+  try {
+    const fake = fakeSdk();
+    const iframeListeners = new Map();
+    const source = {};
+    let injectedScript;
+    const preview = {
+      src: 'https://preview.nexari.test/3111/',
+      hidden: false,
+      contentWindow: source,
+      contentDocument: {
+        createElement() { return { textContent: '', remove() {} }; },
+        head: { append(script) { injectedScript = script.textContent; } },
+      },
+      addEventListener(type, listener) { iframeListeners.set(type, listener); },
+      removeEventListener(type, listener) { if (iframeListeners.get(type) === listener) iframeListeners.delete(type); },
+      removeAttribute(name) { if (name === 'src') this.src = ''; },
+    };
+    const runtime = createVivariRuntime({ id: 'preview-diagnostic-validation', isIsolated: () => true, loadSdk: fake.loader });
+    await runtime.boot({ previewOrigin: 'https://preview.nexari.test', forwardPreviewErrors: true });
+    const received = [];
+    runtime.on('preview-error', (diagnostic) => received.push(diagnostic));
+    const detach = runtime.attachPreview(preview);
+    assert.match(injectedScript, /nexari-preview-diagnostic/);
+    const nonce = injectedScript.match(/nonce: ("[^"]+")/)[1];
+    const forward = windowListeners.get('message');
+    const message = { channel: 'nexari-preview-diagnostic', nonce: JSON.parse(nonce), kind: 'error', message: 'preview boom' };
+    forward({ origin: 'https://attacker.test', source, data: message });
+    forward({ origin: 'https://preview.nexari.test', source: {}, data: message });
+    forward({ origin: 'https://preview.nexari.test', source, data: { ...message, nonce: 'wrong' } });
+    assert.deepEqual(received, []);
+    forward({ origin: 'https://preview.nexari.test', source, data: message });
+    assert.deepEqual(received, [{ kind: 'error', message: 'preview boom' }]);
+    detach();
+    forward({ origin: 'https://preview.nexari.test', source, data: message });
+    assert.equal(received.length, 1);
+    await runtime.teardown();
+
+    const disabled = createVivariRuntime({ id: 'preview-diagnostic-disabled', isIsolated: () => true, loadSdk: fake.loader });
+    await disabled.boot({ previewOrigin: 'https://preview.nexari.test', forwardPreviewErrors: false });
+    disabled.attachPreview(preview);
+    assert.equal(windowListeners.has('message'), false);
+    await disabled.teardown();
+  } finally {
+    globalThis.window = savedWindow;
+  }
 });
 
 test('teardown kills a process already returned to the host before tearing down the guest', async () => {

@@ -12,7 +12,7 @@ const write = (line: string) => { output.textContent += `${line}\n`; };
 const project = {
   'server.js': { file: { contents: [
     "import { createServer } from 'node:http';",
-    "const server = createServer((_, res) => { res.setHeader('content-type', 'text/plain'); res.end('Nexari runtime preview OK'); });",
+    "const server = createServer((_, res) => { res.setHeader('content-type', 'text/html'); res.end('<p>Nexari runtime preview OK</p><script>setTimeout(() => { throw new Error(\"Nexari preview diagnostic proof\"); }, 100);</script>'); });",
     "server.listen(3111, () => console.log('ready'));",
   ].join('\n') } },
   'stdin-echo.js': { file: { contents: [
@@ -78,26 +78,11 @@ async function bootRuntime() {
     throw new Error('Vivari adapter teardown did not terminate after accepting credentialless COEP');
   }
   status.dataset.credentiallessCoepProof = 'accepted-and-torn-down';
-  for (const [option, value] of [
-    ['workdirName', 'nexari-project'],
-    ['forwardPreviewErrors', true],
-  ] as const) {
-    const unsupportedRuntime = createVivariRuntime({
-      id: crypto.randomUUID(),
-      loadSdk: loadPinnedVivariSdk,
-    });
-    try {
-      await unsupportedRuntime.boot({ [option]: value });
-      throw new Error(`Vivari adapter accepted unsupported boot option: ${option}`);
-    } catch (error) {
-      if (!(error instanceof Error)
-        || (error as { code?: unknown }).code !== 'UNSUPPORTED_CAPABILITY'
-        || unsupportedRuntime.state !== 'created') {
-        throw error;
-      }
-    }
-  }
-  status.dataset.unsupportedBootOptionsProof = 'workdirName-forwardPreviewErrors-rejected-before-sdk-load';
+  const bootOptionsRuntime = createVivariRuntime({ id: crypto.randomUUID(), loadSdk: loadPinnedVivariSdk });
+  await bootOptionsRuntime.boot({ workdirName: 'nexari-project', forwardPreviewErrors: true });
+  if (bootOptionsRuntime.state !== 'ready') throw new Error('Vivari adapter did not accept valid WebContainer boot options');
+  await bootOptionsRuntime.teardown();
+  status.dataset.bootOptionsProof = 'workdirName-forwardPreviewErrors-accepted';
   const bootAbortController = new AbortController();
   const abortedBootRuntime = createVivariRuntime({ id: crypto.randomUUID(), loadSdk: loadPinnedVivariSdk });
   const abortedBoot = abortedBootRuntime.boot({ signal: bootAbortController.signal });
@@ -121,7 +106,7 @@ async function bootRuntime() {
   const runtime = createVivariRuntime({ id: runtimeId, loadSdk: loadPinnedVivariSdk });
   activeRuntime = runtime;
   const previewOrigin = window.location.origin;
-  await runtime.boot({ previewOrigin });
+  await runtime.boot({ previewOrigin, workdirName: 'nexari-browser-smoke', forwardPreviewErrors: true });
   status.dataset.selfHostedPreviewOriginProof = previewOrigin;
   const capabilities = runtime.getCapabilities();
   // `interactive_terminal` is experimental: the terminal-dimension and live
@@ -138,6 +123,13 @@ async function bootRuntime() {
     throw new Error('Vivari interactive terminal must stay experimental until its browser terminal-dimension and resize proof passes');
   }
   status.dataset.capabilitiesProof = `${unsupportedCapabilityNames.join('-')}-unsupported-interactive_terminal-experimental-filesystem_watch-experimental`;
+  const previewDiagnostics: Array<{ kind: string; message: string }> = [];
+  runtime.on('preview-error', (diagnostic) => {
+    previewDiagnostics.push(diagnostic);
+    if (diagnostic.kind === 'error' && diagnostic.message.includes('Nexari preview diagnostic proof')) {
+      status.dataset.previewDiagnosticsProof = 'same-origin-error-forwarded';
+    }
+  });
   runtime.attachPreview(preview);
   await runtime.mount(project);
   const instanceMarkerPath = 'nexari-runtime-instance-marker.txt';
@@ -425,7 +417,7 @@ async function bootRuntime() {
       if (runtime.state !== 'ready') return;
       const response = await fetch(url);
       const body = await response.text();
-      if (!response.ok || body !== 'Nexari runtime preview OK') {
+      if (!response.ok || !body.includes('Nexari runtime preview OK')) {
         throw new Error('Vivari server-ready event did not expose a usable preview response');
       }
       if (runtime.state !== 'ready') return;
@@ -504,7 +496,7 @@ async function provePreviewRecovery(runtime: ReturnType<typeof createVivariRunti
   ]);
   const response = await fetch(url);
   const body = await response.text();
-  if (!response.ok || body !== 'Nexari runtime preview OK' || runtime.state !== 'ready') {
+  if (!response.ok || !body.includes('Nexari runtime preview OK') || runtime.state !== 'ready') {
     throw new Error('Vivari preview server recovery did not expose a fresh usable response');
   }
   preview.src = url;

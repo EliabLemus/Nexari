@@ -4,12 +4,21 @@ import test from 'node:test';
 
 const matrixUrl = new URL('../compatibility/bolt-compatibility-matrix.md', import.meta.url);
 
-test('BOLT-WC-002 remains explicitly blocked while preview injection and diagnostics lack browser evidence', async () => {
+test('BOLT-WC-001 is marked proven only with the actual browser boot-options proof', async () => {
   const matrix = await readFile(matrixUrl, 'utf8');
   assert.match(
     matrix,
-    /^\| BOLT-WC-002 \| must-have \| preview-diagnostics: Runtime accepts preview script injection and emits preview diagnostics to the host\. \| app\/lib\/webcontainer\/index\.ts:37-57 \| e2e\/preview-diagnostics\.spec\.ts \| blocked \(preview script injection and preview diagnostics are unsupported; `forwardPreviewErrors` rejects before SDK load\) \|$/m,
-    'BOLT-WC-002 must not remain unknown once the adapter explicitly rejects its only exposed preview-diagnostics boot option before SDK load',
+    /^\| BOLT-WC-001 \| must-have \| boot: WebContainer\.boot accepts coep credentialless, workdirName and forwardPreviewErrors\. \| app\/lib\/webcontainer\/index\.ts:26-30 \| e2e\/browser-smoke\.e2e\.mjs \(actual browser adapter accepts `coep: 'credentialless'`, `workdirName` and `forwardPreviewErrors`\) \| proven \|$/m,
+    'BOLT-WC-001 needs a real browser proof that all three public boot options are accepted before compatibility can be claimed',
+  );
+});
+
+test('BOLT-WC-002 is marked proven only with the same-origin browser preview-diagnostics proof', async () => {
+  const matrix = await readFile(matrixUrl, 'utf8');
+  assert.match(
+    matrix,
+    /^\| BOLT-WC-002 \| must-have \| preview-diagnostics: Runtime accepts preview script injection and emits preview diagnostics to the host\. \| app\/lib\/webcontainer\/index\.ts:37-57 \| e2e\/browser-smoke\.e2e\.mjs \(same-origin preview error is injected, origin\/source\/nonce-bound and forwarded to the host only when `forwardPreviewErrors` is enabled\) \| proven \|$/m,
+    'BOLT-WC-002 needs a real browser proof of opt-in, origin-bound preview diagnostics before compatibility can be claimed',
   );
 });
 

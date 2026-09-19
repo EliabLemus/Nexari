@@ -13,8 +13,8 @@
       "category": "boot",
       "statement": "WebContainer.boot accepts coep credentialless, workdirName and forwardPreviewErrors.",
       "bolt_source": "app/lib/webcontainer/index.ts:26-30",
-      "proof": "e2e/browser-smoke.e2e.mjs (actual browser adapter accepts `coep: 'credentialless'`; `workdirName` and `forwardPreviewErrors` reject explicitly before SDK load)",
-      "nexari_status": "blocked (credentialless proven; `workdirName` and `forwardPreviewErrors` explicitly unsupported)"
+      "proof": "e2e/browser-smoke.e2e.mjs (actual browser adapter accepts `coep: 'credentialless'`, `workdirName` and `forwardPreviewErrors`)",
+      "nexari_status": "proven"
     },
     {
       "id": "BOLT-WC-002",
@@ -22,8 +22,8 @@
       "category": "preview-diagnostics",
       "statement": "Runtime accepts preview script injection and emits preview diagnostics to the host.",
       "bolt_source": "app/lib/webcontainer/index.ts:37-57",
-      "proof": "e2e/preview-diagnostics.spec.ts",
-      "nexari_status": "blocked (preview script injection and preview diagnostics are unsupported; `forwardPreviewErrors` rejects before SDK load)"
+      "proof": "e2e/browser-smoke.e2e.mjs (same-origin preview error is injected, origin/source/nonce-bound and forwarded to the host only when `forwardPreviewErrors` is enabled)",
+      "nexari_status": "proven"
     },
     {
       "id": "BOLT-WC-003",

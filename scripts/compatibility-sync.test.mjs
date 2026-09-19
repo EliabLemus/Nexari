@@ -10,18 +10,21 @@ const run = promisify(execFile);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 test('generate:compatibility output stays in sync with the curated compatibility gate', async () => {
+  // A feature branch is expected to have deliberate compatibility edits. The
+  // generator must preserve that exact pre-existing diff, not demand a clean
+  // repository and not introduce any additional drift.
+  const { stdout: before } = await run('git', ['diff', '--no-ext-diff', '--binary', '--', 'compatibility'], { cwd: repoRoot });
   let npmRun;
   try {
     npmRun = await run('npm', ['run', '--silent', 'generate:compatibility'], { cwd: repoRoot });
   } catch (error) {
     npmRun = { stdout: error.stdout ?? '', stderr: error.stderr ?? String(error) };
   }
-  const { stdout } = await run('git', ['status', '--porcelain', '--', 'compatibility'], { cwd: repoRoot });
-  const drift = stdout.trim();
+  const { stdout: after } = await run('git', ['diff', '--no-ext-diff', '--binary', '--', 'compatibility'], { cwd: repoRoot });
   assert.equal(
-    drift,
-    '',
-    `generate:compatibility must not dirty the compatibility gate (generator exit ${npmRun.stdout === '' ? 'nonzero' : 'zero'}); drift:\n${drift}\n--- generator stderr ---\n${npmRun.stderr}`,
+    after,
+    before,
+    `generate:compatibility must preserve the existing compatibility diff (generator exit ${npmRun.stdout === '' ? 'nonzero' : 'zero'}); new drift:\n${after}\n--- generator stderr ---\n${npmRun.stderr}`,
   );
 
   // The generated inventory must mirror the curated matrix exactly: every

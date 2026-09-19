@@ -10,6 +10,7 @@ import {
   type RuntimeFsWatcher,
   type RuntimeProcess,
   type RuntimeEventMap,
+  type RuntimePreviewDiagnostic,
   type RuntimeTerminalDimensions,
 } from '../../runtime-contract/dist/index.js';
 
@@ -96,6 +97,9 @@ class NexariVivariRuntime implements BrowserRuntime {
   #exportPromises = new Set<Promise<{ files: Array<{ path: string; contents: Uint8Array }>; truncated: boolean }>>();
   #bootPromise: Promise<void> | undefined;
   #bootPreviewOrigin: string | undefined;
+  #bootWorkdirName: string | undefined;
+  #forwardPreviewErrors = false;
+  #previewDiagnosticListeners = new Set<(diagnostic: RuntimePreviewDiagnostic) => void>();
   #guestBootPromise: Promise<VivariLike> | undefined;
   #guestBootInFlight = false;
   #bootAbortController: AbortController | undefined;
@@ -228,18 +232,24 @@ class NexariVivariRuntime implements BrowserRuntime {
     if (isStackBlitzPreviewOrigin(options?.previewOrigin)) {
       return Promise.reject(new RuntimeError('UNSUPPORTED_CAPABILITY', 'StackBlitz preview origins are intentionally unavailable in Nexari.'));
     }
-    const unsupportedOption = unsupportedBootOption(options);
-    if (unsupportedOption) {
-      return Promise.reject(new RuntimeError('UNSUPPORTED_CAPABILITY', `Unsupported boot option: ${unsupportedOption}`));
+    const invalidOption = invalidBootOption(options);
+    if (invalidOption) {
+      return Promise.reject(new RuntimeError('UNSUPPORTED_CAPABILITY', `Invalid boot option: ${invalidOption}`));
     }
     const previewOrigin = normalizePreviewOrigin(options?.previewOrigin);
+    const workdirName = options?.workdirName;
+    const forwardPreviewErrors = options?.forwardPreviewErrors === true;
     if (this.#bootPromise) {
-      if (previewOrigin !== this.#bootPreviewOrigin) {
+      if (previewOrigin !== this.#bootPreviewOrigin
+        || workdirName !== this.#bootWorkdirName
+        || forwardPreviewErrors !== this.#forwardPreviewErrors) {
         return Promise.reject(new RuntimeError('BOOT_FAILED', 'Runtime boot options cannot change while boot is in progress.'));
       }
       return this.#bootPromise;
     }
     this.#bootPreviewOrigin = previewOrigin;
+    this.#bootWorkdirName = workdirName;
+    this.#forwardPreviewErrors = forwardPreviewErrors;
     const bootPromise = this.#boot({ ...options, ...(previewOrigin === undefined ? {} : { previewOrigin }) });
     this.#bootPromise = bootPromise;
     // #boot starts synchronously until its first await. Clear this cache only
@@ -249,6 +259,8 @@ class NexariVivariRuntime implements BrowserRuntime {
       if (this.state === 'created' && this.#bootPromise === bootPromise) {
         this.#bootPromise = undefined;
         this.#bootPreviewOrigin = undefined;
+        this.#bootWorkdirName = undefined;
+        this.#forwardPreviewErrors = false;
       }
     });
     return bootPromise;
@@ -451,6 +463,7 @@ class NexariVivariRuntime implements BrowserRuntime {
 
   attachPreview(iframe: HTMLIFrameElement): () => void | PromiseLike<void> {
     const detach = this.#ready().attachPreview(iframe);
+    const detachDiagnostics = this.#attachPreviewDiagnostics(iframe);
     const generation = (previewGenerations.get(iframe) ?? 0) + 1;
     previewGenerations.set(iframe, generation);
     let active = true;
@@ -464,6 +477,7 @@ class NexariVivariRuntime implements BrowserRuntime {
         iframe.removeAttribute?.('src');
         iframe.hidden = true;
       }
+      detachDiagnostics();
       const result = detach();
       if (result && typeof (result as PromiseLike<void>).then === 'function') {
         pendingDetach = Promise.resolve(result).then(
@@ -511,6 +525,10 @@ class NexariVivariRuntime implements BrowserRuntime {
         if (active && this.state === 'ready') (listener as (error: Error) => void)(error);
       };
       detach = instance.on('error', forwardIfReady);
+    } else if (event === 'preview-error') {
+      const previewListener = listener as (diagnostic: RuntimePreviewDiagnostic) => void;
+      this.#previewDiagnosticListeners.add(previewListener);
+      detach = () => { this.#previewDiagnosticListeners.delete(previewListener); };
     } else {
       throw new RuntimeError('UNSUPPORTED_CAPABILITY', `Unsupported event ${String(event)}`);
     }
@@ -623,6 +641,48 @@ class NexariVivariRuntime implements BrowserRuntime {
 
   getCapabilities(): RuntimeCapabilities { return unsupportedCapabilities(); }
 
+  #attachPreviewDiagnostics(iframe: HTMLIFrameElement): () => void {
+    if (!this.#forwardPreviewErrors || typeof window === 'undefined') return () => {};
+    let active = true;
+    let expectedOrigin: string | undefined;
+    let expectedSource: MessageEventSource | null = null;
+    const nonce = crypto.randomUUID();
+    const forward = (event: MessageEvent<unknown>) => {
+      if (!active || this.state !== 'ready' || event.origin !== expectedOrigin || event.source !== expectedSource) return;
+      const diagnostic = parsePreviewDiagnostic(event.data, nonce);
+      if (!diagnostic) return;
+      for (const listener of this.#previewDiagnosticListeners) listener(diagnostic);
+    };
+    const inject = () => {
+      try {
+        const origin = new URL(iframe.src).origin;
+        if (this.#bootPreviewOrigin && origin !== this.#bootPreviewOrigin) return;
+        const source = iframe.contentWindow;
+        const document = iframe.contentDocument;
+        if (!source || !document?.createElement || !document.head) return;
+        expectedOrigin = origin;
+        expectedSource = source;
+        const script = document.createElement('script');
+        script.textContent = previewDiagnosticScript(nonce, origin);
+        document.head.append(script);
+        script.remove();
+      } catch {
+        // Cross-origin or an unreadable transient iframe is intentionally not a
+        // diagnostic source. A later same-origin load gets another injection.
+      }
+    };
+    window.addEventListener('message', forward);
+    iframe.addEventListener?.('load', inject);
+    inject();
+    return () => {
+      active = false;
+      expectedOrigin = undefined;
+      expectedSource = null;
+      window.removeEventListener('message', forward);
+      iframe.removeEventListener?.('load', inject);
+    };
+  }
+
   #isTornDown(): boolean {
     return this.state === 'terminated' || this.state === 'tearing_down';
   }
@@ -690,14 +750,39 @@ function hasPreviewOriginPathQueryOrFragment(previewOrigin: string | undefined):
   return pathname !== '/' || search.length > 0 || hash.length > 0 || /[?#]$/.test(previewOrigin);
 }
 
-function unsupportedBootOption(options?: RuntimeBootOptions): 'coep' | 'workdirName' | 'forwardPreviewErrors' | undefined {
+function invalidBootOption(options?: RuntimeBootOptions): 'coep' | 'workdirName' | 'forwardPreviewErrors' | undefined {
   if (!options) return undefined;
   // The host's `credentialless` request is satisfied by the outer document's
   // isolation headers; Vivari must not receive a WebContainer-specific option.
   // Keep every other value fail-closed for untyped JavaScript callers.
   if (options.coep !== undefined && options.coep !== 'credentialless') return 'coep';
-  for (const option of ['workdirName', 'forwardPreviewErrors'] as const) {
-    if (Object.hasOwn(options, option)) return option;
-  }
+  if (options.workdirName !== undefined && (!isSafeWorkdirName(options.workdirName))) return 'workdirName';
+  if (options.forwardPreviewErrors !== undefined && typeof options.forwardPreviewErrors !== 'boolean') return 'forwardPreviewErrors';
   return undefined;
+}
+
+function isSafeWorkdirName(value: unknown): value is string {
+  return typeof value === 'string'
+    && value.length > 0
+    && value.length <= 128
+    && value !== '.'
+    && value !== '..'
+    && !/[\\/\0-\x1f\x7f]/.test(value);
+}
+
+function parsePreviewDiagnostic(value: unknown, nonce: string): RuntimePreviewDiagnostic | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const record = value as Record<string, unknown>;
+  if (record.channel !== 'nexari-preview-diagnostic' || record.nonce !== nonce) return undefined;
+  if ((record.kind !== 'error' && record.kind !== 'unhandledrejection') || typeof record.message !== 'string') return undefined;
+  const diagnostic: RuntimePreviewDiagnostic = { kind: record.kind, message: record.message };
+  if (typeof record.filename === 'string') diagnostic.filename = record.filename;
+  if (typeof record.line === 'number') diagnostic.line = record.line;
+  if (typeof record.column === 'number') diagnostic.column = record.column;
+  if (typeof record.stack === 'string') diagnostic.stack = record.stack;
+  return diagnostic;
+}
+
+function previewDiagnosticScript(nonce: string, targetOrigin: string): string {
+  return `(() => { const send = (kind, value) => parent.postMessage({ channel: 'nexari-preview-diagnostic', nonce: ${JSON.stringify(nonce)}, kind, ...value }, ${JSON.stringify(targetOrigin)}); window.addEventListener('error', (event) => send('error', { message: String(event.message || 'Preview error'), filename: event.filename || undefined, line: event.lineno || undefined, column: event.colno || undefined, stack: event.error && event.error.stack || undefined })); window.addEventListener('unhandledrejection', (event) => { const reason = event.reason; send('unhandledrejection', { message: String(reason && reason.message || reason || 'Unhandled rejection'), stack: reason && reason.stack || undefined }); }); })();`;
 }

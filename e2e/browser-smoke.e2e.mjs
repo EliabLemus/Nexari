@@ -91,9 +91,9 @@ try {
     'credentialless COEP must boot and tear down through the actual isolated browser adapter before the primary runtime starts',
   );
   assert.equal(
-    await evaluate(`document.querySelector('#status')?.dataset.unsupportedBootOptionsProof`),
-    'workdirName-forwardPreviewErrors-rejected-before-sdk-load',
-    'unsupported WebContainer boot options must fail closed through the actual isolated browser adapter before the primary runtime starts',
+    await evaluate(`document.querySelector('#status')?.dataset.bootOptionsProof`),
+    'workdirName-forwardPreviewErrors-accepted',
+    'valid WebContainer boot options must boot and tear down through the actual isolated browser adapter before the primary runtime starts',
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.abortedBootProof`),
@@ -119,13 +119,16 @@ try {
     'server-ready must not expose a preview until the host has observed a usable in-VM HTTP response',
   );
   assert.match(await evaluate(`document.querySelector('#preview')?.src`), /^http:\/\//, 'preview must have a runtime URL');
-  assert.deepEqual(
-    await evaluate(`fetch(document.querySelector('#preview').src).then(async (response) => ({
+  const previewResponse = await evaluate(`fetch(document.querySelector('#preview').src).then(async (response) => ({
       status: response.status,
       body: await response.text(),
-    }))`, true),
-    { status: 200, body: 'Nexari runtime preview OK' },
-    'the preview URL must serve the in-VM server payload through the controlled lab origin',
+    }))`, true);
+  assert.equal(previewResponse.status, 200, 'the preview URL must return an in-VM 200 response through the controlled lab origin');
+  assert.match(previewResponse.body, /Nexari runtime preview OK/, 'the preview response must retain the in-VM server payload after the owned preview instrumentation');
+  assert.equal(
+    await waitFor(() => evaluate(`document.querySelector('#status')?.dataset.previewDiagnosticsProof === 'same-origin-error-forwarded'`)),
+    true,
+    'the opt-in preview relay must inject its capture script and forward a same-origin preview error to the host',
   );
   assert.equal(
     await evaluate(`document.querySelector('#status')?.dataset.fsProof`),
@@ -242,11 +245,9 @@ try {
     true,
     'the host must kill a stalled guest process, observe its exit and closed output, then spawn a new process without disturbing preview availability',
   );
-  assert.deepEqual(
-    await evaluate(`fetch(document.querySelector('#preview').src).then(async (response) => ({ status: response.status, body: await response.text() }))`, true),
-    { status: 200, body: 'Nexari runtime preview OK' },
-    'cancelling a stalled guest process must not disturb the ready preview route',
-  );
+  const postCancellationPreview = await evaluate(`fetch(document.querySelector('#preview').src).then(async (response) => ({ status: response.status, body: await response.text() }))`, true);
+  assert.equal(postCancellationPreview.status, 200, 'cancelling a stalled guest process must not disturb the ready preview route');
+  assert.match(postCancellationPreview.body, /Nexari runtime preview OK/, 'the ready preview response must retain its in-VM payload after cancellation');
   await evaluate('window.__nexariProvePreviewRecovery?.()', true);
   const previewRecovered = await waitFor(() => evaluate(
     `document.querySelector('#status')?.dataset.previewRecoveryProof === 'killed-port-close-respawn-server-ready-fetch-200'`,
@@ -310,11 +311,9 @@ try {
     'the rebooted Vivari runtime must start without the prior instance filesystem marker',
   );
   assert.equal(rebootPreviewUrl, previewUrl, 'the controlled-origin preview route is port-addressed and must remain stable across fresh runtime instances');
-  assert.deepEqual(
-    await evaluate(`fetch(document.querySelector('#preview').src).then(async (response) => ({ status: response.status, body: await response.text() }))`, true),
-    { status: 200, body: 'Nexari runtime preview OK' },
-    'a rebooted runtime preview must serve a fresh in-VM response',
-  );
+  const rebootPreviewResponse = await evaluate(`fetch(document.querySelector('#preview').src).then(async (response) => ({ status: response.status, body: await response.text() }))`, true);
+  assert.equal(rebootPreviewResponse.status, 200, 'a rebooted runtime preview must serve a fresh in-VM response');
+  assert.match(rebootPreviewResponse.body, /Nexari runtime preview OK/, 'the rebooted preview response must retain its in-VM payload after instrumentation');
 
   await command('Target.closeTarget', { targetId });
   browser.close();
