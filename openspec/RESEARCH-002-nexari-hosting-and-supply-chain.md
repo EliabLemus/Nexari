@@ -39,7 +39,7 @@ The working Nexari browser lab serves, from the application origin:
 
 Its Vite middleware applies COOP/COEP on all responses and rejects symlink traversal for vendor files. A Bolt deployment must provide an equivalent asset manifest and header policy; it cannot import Nexari as a bare TypeScript facade and expect worker/Wasm URLs to resolve.
 
-## R-04 — Current supply-chain reproducibility is blocked (P0)
+## R-04 — Exact pin is currently retrievable; durable supply-chain ownership remains blocked (P0)
 
 The Nexari superproject pins submodule `runtime/vivari` at:
 
@@ -47,7 +47,7 @@ The Nexari superproject pins submodule `runtime/vivari` at:
 210d50d3f314b1fc6b148776ee24c2d48d8d022d
 ```
 
-but `.gitmodules` points to `https://github.com/maitrungduc1410/vivari.git`, whose server no longer advertises that object. A clean integration worktree's `git submodule update --init --recursive` failed with:
+The prior clean integration worktree observation found the public server would not provide that object:
 
 ```text
 remote error: upload-pack: not our ref 210d50d3f314b1fc6b148776ee24c2d48d8d022d
@@ -59,20 +59,26 @@ The current Nexari main worktree does contain the pinned source on a local branc
 /Users/openjaime/Projects/nexari-vivari-pinned-reference
 ```
 
-This makes local research possible, but it does **not** make the project reproducible for a clean machine, CI, or a Bolt fork.
+That failure is no longer the current state. At **2026-09-21T10:12:07Z**, from this machine using `git version 2.50.1 (Apple Git-155)`, the exact command below exited `0` and resolved `FETCH_HEAD` to the literal pin:
 
-**Required decision before integration code:** publish or configure an owner-controlled private mirror/fork that contains commit `210d50d…`, then update the submodule URL/pin and provenance guard in one reviewed change. Do not silently repin to whatever the public upstream currently serves.
+```text
+GIT_TERMINAL_PROMPT=0 git -C runtime/vivari fetch --no-tags origin 210d50d3f314b1fc6b148776ee24c2d48d8d022d
+```
+
+This is a single timestamped observation from one network position. It proves that the configured public origin served the exact object then; it does **not** prove that a fresh `git clone --recurse-submodules` or CI checkout is durable, nor that the upstream will retain an unadvertised SHA. The earlier contradictory fetch result itself demonstrates why availability from an owner-controlled public upstream is mutable.
+
+**Required decision before Bolt-facing integration code:** publish or configure an owner-controlled private mirror/fork that contains commit `210d50d…`, then update the submodule URL/pin and provenance guard in one reviewed change. Do not silently repin to whatever the public upstream currently serves. The new `npm run check:vivari-submodule-pin` gate prevents a silent local repin but intentionally does not claim external retention.
 
 ## R-05 — Toolchain baseline
 
 - Node: Bolt.DIY requires Node `>=18.18`; the local machine runs Node `v22.23.1`.
 - pnpm: Bolt's declared package manager is available and the pinned reference checkout built/typechecked successfully.
 - Nexari's build runner pins Rust `1.88.0-aarch64-apple-darwin`; that compiler is installed locally.
-- Actual Vivari source builds also depend on the submodule contents and its vendored artifacts. Because R-04 blocks clean submodule initialization, a fresh full build is not currently a valid reproducibility proof.
+- Actual Vivari source builds also depend on the submodule contents and its vendored artifacts. The exact pin is presently fetchable, but no clean-clone/CI proof has established durable reproducibility; a fresh full build remains insufficient until the owner-controlled mirror decision is executed and verified.
 
 ## Execution impact
 
-Add **Delta 000 — restore reproducible pinned Vivari source** before existing Delta 001. It is a supply-chain/configuration task, not a semantic runtime rewrite. All Bolt-facing code remains blocked until it has a deterministic Judge result.
+Keep **Delta 000 — restore reproducible pinned Vivari source** before existing Delta 001. It is a supply-chain/configuration task, not a semantic runtime rewrite. The immediate false blocker is reduced to a timestamped observation, but all Bolt-facing code remains blocked until an owner-controlled mirror has a deterministic clean-clone Judge result.
 
 ## Sources
 
