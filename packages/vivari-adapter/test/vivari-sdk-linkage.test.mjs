@@ -8,7 +8,7 @@ const repositoryRoot = fileURLToPath(new URL('../../..', import.meta.url));
 const coreEntrypoint = new URL('../../../runtime/vivari/packages/core/dist/index.js', import.meta.url);
 
 test('the adapter type-checks against the owned Vivari fork declarations', () => {
-  execFileSync('npx', ['tsc', '-p', 'tsconfig.linkage.json', '--noEmit'], {
+  execFileSync('tsc', ['-p', 'tsconfig.linkage.json', '--noEmit'], {
     cwd: adapterRoot,
     stdio: 'pipe',
   });

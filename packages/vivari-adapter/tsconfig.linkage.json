@@ -5,6 +5,7 @@
     "moduleResolution": "NodeNext",
     "strict": true,
     "skipLibCheck": true,
+    "ignoreDeprecations": "6.0",
     "baseUrl": "../..",
     "paths": {
       "@vivari/core": ["runtime/vivari/packages/core/dist/index.d.ts"]
