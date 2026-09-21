@@ -16,7 +16,7 @@
 
 ## Delta 000 — Restore reproducible pinned Vivari source
 
-**Status:** Reduced — public exact-SHA retrieval observed; durable supply-chain ownership remains blocked by owner decision
+**Status:** Blocked — the public origin does not currently serve the exact pin to a clean repository; durable supply-chain ownership requires an owner decision
 
 **Objective:** Make the exact runtime source checked out by Nexari reproducible on a clean machine and CI.
 
@@ -24,7 +24,7 @@
 - Modify only after approval: `.gitmodules`, `runtime/vivari` gitlink, provenance ledger/tests, and CI checkout configuration as required.
 - Do not modify semantic runtime source as part of this delta.
 
-**Observed retrieval (2026-09-21T10:12:07Z):** from this machine, `git version 2.50.1 (Apple Git-155)` successfully ran `GIT_TERMINAL_PROMPT=0 git -C runtime/vivari fetch --no-tags origin 210d50d3f314b1fc6b148776ee24c2d48d8d022d` with exit `0`; `FETCH_HEAD` resolved to the literal pin. This is one timestamped observation from one network position, not a guarantee: the public upstream remains owner-controlled and can rewrite, delete, privatize, or stop serving an unadvertised object.
+**Clean-source retrieval failure (2026-09-21T10:55:04Z):** an ephemeral empty repository at `/private/tmp/nexari-vivari-pin-probe.*`, with `origin` set to `https://github.com/maitrungduc1410/vivari.git`, ran `GIT_TERMINAL_PROMPT=0 git -C <empty> fetch --no-tags origin 210d50d3f314b1fc6b148776ee24c2d48d8d022d`. It exited `128` with `fatal: remote error: upload-pack: not our ref 210d50d3f314b1fc6b148776ee24c2d48d8d022d`. The temporary repository was deleted; the integration worktree was not mutated. This is a direct clean-repository fetch observation, not a full clone result and not a claim that the pin is permanently unavailable. It supersedes the earlier local-checkout fetch as evidence of clean retrieval: a local checkout can retain the object even while the public origin refuses to serve it anew.
 
 **Required decision for durable CI/release:** provide an owner-controlled immutable mirror or private fork containing `210d50d3f314b1fc6b148776ee24c2d48d8d022d`. Do not replace the pin with a current public upstream tip merely to unblock checkout. Bolt-facing code remains blocked pending that durability decision; the current observation permits only reversible local source/test work.
 
