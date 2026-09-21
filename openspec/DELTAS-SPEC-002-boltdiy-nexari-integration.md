@@ -9,7 +9,33 @@
   - base: `0e1c8d0`
 - **Read-only Bolt.DIY reference:** `/Users/openjaime/Projects/bolt.diy-nexari-reference`
   - pinned upstream commit: `2e254ac19a696394030601bc602f54945b12bfc4`
+- **Read-only pinned Vivari recovery reference:** `/Users/openjaime/Projects/nexari-vivari-pinned-reference`
+  - preserves Nexari's locally available submodule commit `210d50d3f314b1fc6b148776ee24c2d48d8d022d`.
+- **P0 environment blocker:** a clean `git submodule update --init --recursive` cannot obtain that SHA from the public upstream configured in `.gitmodules`. The integration worktree must not build against its accidentally fetched substitute checkout.
 - No Bolt application files, runtime implementation files, environment files, credentials, remotes, or deployments have been changed.
+
+## Delta 000 — Restore reproducible pinned Vivari source
+
+**Status:** Blocked by owner decision; required before all code integration work
+
+**Objective:** Make the exact runtime source checked out by Nexari reproducible on a clean machine and CI.
+
+**Files:**
+- Modify only after approval: `.gitmodules`, `runtime/vivari` gitlink, provenance ledger/tests, and CI checkout configuration as required.
+- Do not modify semantic runtime source as part of this delta.
+
+**Required decision:** provide an owner-controlled immutable mirror or private fork containing `210d50d3f314b1fc6b148776ee24c2d48d8d022d`. Do not replace the pin with a current public upstream tip merely to unblock checkout.
+
+**Verification:**
+```text
+rm -rf <fresh-clone>
+git clone --recurse-submodules <Nexari fork> <fresh-clone>
+git -C <fresh-clone>/runtime/vivari rev-parse HEAD  # exact approved SHA
+git -C <fresh-clone> status --short                 # clean
+npm ci && npm run build:vivari && npm run build
+```
+
+**Acceptance:** a fresh clone obtains the reviewed SHA without local object sharing, and the provenance guard identifies the exact source/mirror.
 
 ## Delta 001 — Freeze the observed Bolt runtime seam
 
