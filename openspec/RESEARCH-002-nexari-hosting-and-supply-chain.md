@@ -70,6 +70,19 @@ The temporary repository was deleted and the integration worktree was not mutate
 
 **Required decision before Bolt-facing integration code:** publish or configure an owner-controlled private mirror/fork that contains commit `210d50d…`, then update the submodule URL/pin and provenance guard in one reviewed change. Do not silently repin to whatever the public upstream currently serves. The new `npm run check:vivari-submodule-pin` gate prevents a silent local repin but intentionally does not claim external retention.
 
+### Mirror recovery attempt — pending Git write authorization
+
+On 2026-09-22, GitHub's REST API accepted creation of the intended private owner-controlled repository `EliabLemus/nexari-vivari-provenance-20260922`. The local recovery reference was independently checked to contain `210d50d3f314b1fc6b148776ee24c2d48d8d022d` before publication was attempted.
+
+Publication is **not complete**: `git push` to that HTTPS remote returned `403 Write access to repository not granted`; the machine's SSH identity is a repository-scoped deploy key for `EliabLemus/pricing-tracker-web`, not an owner key for the mirror. The mirror must not be placed in `.gitmodules`, the provenance ledger, or a release claim until an authenticated `git push` succeeds and an empty-repository fetch retrieves the exact SHA. The required next proof remains:
+
+```text
+GIT_TERMINAL_PROMPT=0 git -C <empty> fetch --no-tags \
+  https://github.com/EliabLemus/nexari-vivari-provenance-20260922.git \
+  210d50d3f314b1fc6b148776ee24c2d48d8d022d
+git -C <empty> rev-parse FETCH_HEAD  # exact SHA
+```
+
 ## R-05 — Toolchain baseline
 
 - Node: Bolt.DIY requires Node `>=18.18`; the local machine runs Node `v22.23.1`.

@@ -28,6 +28,8 @@
 
 **Required decision for durable CI/release:** provide an owner-controlled immutable mirror or private fork containing `210d50d3f314b1fc6b148776ee24c2d48d8d022d`. Do not replace the pin with a current public upstream tip merely to unblock checkout. Bolt-facing code remains blocked pending that durability decision; the current observation permits only reversible local source/test work.
 
+**Current mirror candidate (not yet adopted):** GitHub REST creation returned `EliabLemus/nexari-vivari-provenance-20260922` on 2026-09-22, but the subsequent authenticated Git publication attempt failed with `403 Write access to repository not granted`. This is not mirror evidence. Do not change `.gitmodules` or the provenance ledger to this URL until the exact pin has passed an empty-repository fetch from it.
+
 **Verification:**
 ```text
 npm run check:vivari-submodule-pin  # committed gitlink and checkout remain the exact pin
