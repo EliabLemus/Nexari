@@ -26,7 +26,7 @@
 
 **Clean-source retrieval failure (2026-09-21T10:55:04Z):** an ephemeral empty repository at `/private/tmp/nexari-vivari-pin-probe.*`, with `origin` set to `https://github.com/maitrungduc1410/vivari.git`, ran `GIT_TERMINAL_PROMPT=0 git -C <empty> fetch --no-tags origin 210d50d3f314b1fc6b148776ee24c2d48d8d022d`. It exited `128` with `fatal: remote error: upload-pack: not our ref 210d50d3f314b1fc6b148776ee24c2d48d8d022d`. The temporary repository was deleted; the integration worktree was not mutated. This is a direct clean-repository fetch observation, not a full clone result and not a claim that the pin is permanently unavailable. It supersedes the earlier local-checkout fetch as evidence of clean retrieval: a local checkout can retain the object even while the public origin refuses to serve it anew.
 
-**Required decision for durable CI/release:** provide an owner-controlled immutable mirror or private fork containing `210d50d3f314b1fc6b148776ee24c2d48d8d022d`. Do not replace the pin with a current public upstream tip merely to unblock checkout. Bolt-facing code remains blocked pending that durability decision; the current observation permits only reversible local source/test work.
+**Durable CI/release condition:** credentialed CI must be granted read access to the owner-controlled immutable mirror. Do not replace the pin with a current public upstream tip merely to unblock checkout. The pin-retrieval decision is resolved; Bolt-facing work remains a separately scoped integration decision.
 
 **Historical mirror failure (preserved):** GitHub REST creation returned `EliabLemus/nexari-vivari-provenance-20260922` on 2026-09-22, but an earlier authenticated Git publication attempt failed with `403 Write access to repository not granted`. It was not evidence of retrievability.
 
@@ -46,7 +46,7 @@ npm ci && npm run build:vivari && npm run build
 
 ## Delta 001 — Freeze the observed Bolt runtime seam
 
-**Status:** Nexari-side seam inventory and owned contract are complete. Bolt application call-site migration remains blocked by Delta 000's reproducible-source decision and the separately scoped Bolt integration work.
+**Status:** Nexari-side seam inventory and owned contract are complete. Bolt application call-site migration remains a separately scoped Bolt integration task; it is no longer blocked by pinned-source reproducibility.
 
 **Objective:** Turn actual Bolt call sites into a narrow, explicit compatibility interface and prove the baseline before swapping any backend.
 
@@ -89,7 +89,7 @@ The executable adapter is committed in `1f1684c` as `packages/vivari-adapter/src
 
 ## Delta 003 — Backend selector and facade
 
-**Status:** Blocked by Delta 001 and Delta 002
+**Status:** Not started — Delta 001 and Delta 002 are complete on the Nexari side. This requires an explicitly authorized Bolt checkout/fork integration scope, an integration ownership decision, and an opt-in selector design that preserves the default WebContainer path.
 
 **Objective:** Add an explicit `nexari` development backend behind a default-preserving selector.
 
@@ -183,4 +183,4 @@ git status --short
 
 ## Explicit stop condition
 
-No application source changes begin until the owner gives a direct start signal. The next action after approval is **Delta 001, then Delta 002**; do not jump to preview UI work before the terminal spike passes.
+The owner has authorized reversible Nexari-side contract, adapter, and test work. No Bolt application source changes begin without a separately explicit Bolt integration authorization and the required integration/preview-hosting decisions. Do not jump to preview UI work before that scope exists.
