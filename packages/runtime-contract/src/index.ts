@@ -3,6 +3,15 @@ import { RuntimeError } from './errors.js';
 
 export { unsupportedCapabilities, type CapabilityName, type CapabilityState, type RuntimeCapabilities } from './capabilities.js';
 export { RuntimeError, type RuntimeErrorCode } from './errors.js';
+export {
+  REPL_BANNER,
+  PROMPT_SHAPE,
+  type InteractiveReplLane,
+  type ExecCaptureResult,
+  type ExecCaptureOptions,
+  type ExecCaptureLane,
+  type BoltTerminalSeam,
+} from './terminal-seam.js';
 
 export type RuntimeBackend = 'vivari' | 'stackblitz';
 export type RuntimeState = 'created' | 'booting' | 'ready' | 'tearing_down' | 'terminated';
