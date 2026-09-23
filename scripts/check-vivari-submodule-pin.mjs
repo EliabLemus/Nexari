@@ -29,20 +29,12 @@ async function git(...args) {
   return stdout;
 }
 
-async function optionalGit(...args) {
-  try {
-    return await git(...args);
-  } catch {
-    return '';
-  }
-}
-
 if (import.meta.url === new URL(process.argv[1], 'file:').href) {
   const [gitlink, submoduleHead, submoduleUrl, submoduleBranch] = await Promise.all([
     git('ls-tree', 'HEAD', 'runtime/vivari'),
     git('-C', 'runtime/vivari', 'rev-parse', 'HEAD'),
     git('config', '-f', '.gitmodules', '--get', 'submodule.runtime/vivari.url'),
-    optionalGit('config', '-f', '.gitmodules', '--get', 'submodule.runtime/vivari.branch'),
+    git('config', '-f', '.gitmodules', '--default', '', '--get', 'submodule.runtime/vivari.branch'),
   ]);
   validatePinnedVivariSubmodule({ gitlink, submoduleHead });
   validatePinnedVivariProvenance({ submoduleUrl, submoduleBranch });
