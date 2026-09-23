@@ -1,3 +1,5 @@
+export { createBoltTerminalSeam } from './terminal-seam.js';
+
 import {
   RuntimeError,
   RuntimeLifecycle,
