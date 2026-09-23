@@ -39,7 +39,7 @@ The working Nexari browser lab serves, from the application origin:
 
 Its Vite middleware applies COOP/COEP on all responses and rejects symlink traversal for vendor files. A Bolt deployment must provide an equivalent asset manifest and header policy; it cannot import Nexari as a bare TypeScript facade and expect worker/Wasm URLs to resolve.
 
-## R-04 — Exact pin is not currently retrievable from a clean repository; durable supply-chain ownership remains blocked (P0)
+## R-04 — Exact pin is retrievable from an owner-controlled private mirror (resolved P0)
 
 The Nexari superproject pins submodule `runtime/vivari` at:
 
@@ -68,18 +68,32 @@ fatal: remote error: upload-pack: not our ref 210d50d3f314b1fc6b148776ee24c2d48d
 
 The temporary repository was deleted and the integration worktree was not mutated. This was a direct empty-repository fetch, not a full `git clone --recurse-submodules` result and not a claim that the pin is permanently unavailable. A prior **2026-09-21T10:12:07Z** fetch from the pre-existing local `runtime/vivari` checkout resolved `FETCH_HEAD` to the literal pin, but that checkout already retained local objects; it does not establish clean-source retrieval. The contradictory observations demonstrate why availability from this owner-controlled public upstream is mutable and cannot be treated as reproducible CI evidence.
 
-**Required decision before Bolt-facing integration code:** publish or configure an owner-controlled private mirror/fork that contains commit `210d50d…`, then update the submodule URL/pin and provenance guard in one reviewed change. Do not silently repin to whatever the public upstream currently serves. The new `npm run check:vivari-submodule-pin` gate prevents a silent local repin but intentionally does not claim external retention.
+**Resolved decision before Bolt-facing integration code:** preserve commit `210d50d…` in an owner-controlled private mirror, then update the submodule URL and provenance guard in one reviewed change. Do not silently repin to whatever the public upstream currently serves. The `npm run check:vivari-submodule-pin` gate prevents both a local repin and an unreviewed provenance URL change.
 
-### Mirror recovery attempt — pending Git write authorization
+### Mirror recovery — historical failed attempt and successful owner publication
 
 On 2026-09-22, GitHub's REST API accepted creation of the intended private owner-controlled repository `EliabLemus/nexari-vivari-provenance-20260922`. The local recovery reference was independently checked to contain `210d50d3f314b1fc6b148776ee24c2d48d8d022d` before publication was attempted.
 
-Publication is **not complete**: `git push` to that HTTPS remote returned `403 Write access to repository not granted`; the machine's SSH identity is a repository-scoped deploy key for `EliabLemus/pricing-tracker-web`, not an owner key for the mirror. The mirror must not be placed in `.gitmodules`, the provenance ledger, or a release claim until an authenticated `git push` succeeds and an empty-repository fetch retrieves the exact SHA. The required next proof remains:
+The first publication attempt was **not complete**: `git push` to that HTTPS remote returned `403 Write access to repository not granted`; the machine's SSH identity was a repository-scoped deploy key for `EliabLemus/pricing-tracker-web`, not an owner key for the mirror. This remains historical failure evidence.
+
+On **2026-09-22T22:15:49-0600**, owner-authorized HTTPS credentials published the exact pin at:
 
 ```text
-GIT_TERMINAL_PROMPT=0 git -C <empty> fetch --no-tags \
+refs/heads/provenance/pinned-210d50d3f314
+```
+
+An ephemeral empty repository using those authorized credentials fetched that advertised ref, resolved `FETCH_HEAD` to the exact pin, and passed `git fsck --no-dangling --no-progress`. The adopted `.gitmodules` URL is now:
+
+```text
+https://github.com/EliabLemus/nexari-vivari-provenance-20260922.git
+```
+
+This is a private mirror: clean source retrieval is guaranteed for authorized developer/CI credentials with repository read access, not anonymous clients. The former public-origin failure remains intentionally preserved above. The proof executed was:
+
+```text
+git -C <empty> fetch --no-tags \
   https://github.com/EliabLemus/nexari-vivari-provenance-20260922.git \
-  210d50d3f314b1fc6b148776ee24c2d48d8d022d
+  refs/heads/provenance/pinned-210d50d3f314
 git -C <empty> rev-parse FETCH_HEAD  # exact SHA
 ```
 
@@ -88,11 +102,11 @@ git -C <empty> rev-parse FETCH_HEAD  # exact SHA
 - Node: Bolt.DIY requires Node `>=18.18`; the local machine runs Node `v22.23.1`.
 - pnpm: Bolt's declared package manager is available and the pinned reference checkout built/typechecked successfully.
 - Nexari's build runner pins Rust `1.88.0-aarch64-apple-darwin`; that compiler is installed locally.
-- Actual Vivari source builds also depend on the submodule contents and its vendored artifacts. The public origin currently refuses the exact pin to a clean repository, so a fresh full build remains insufficient until the owner-controlled mirror decision is executed and verified.
+- Actual Vivari source builds also depend on the submodule contents and its vendored artifacts. The public origin still refuses the exact pin, but authorized clean repositories can retrieve it from the owner-controlled private mirror.
 
 ## Execution impact
 
-Keep **Delta 000 — restore reproducible pinned Vivari source** before existing Delta 001. It is a supply-chain/configuration task, not a semantic runtime rewrite. The clean-source blocker is again directly observed, and all Bolt-facing code remains blocked until an owner-controlled mirror has a deterministic clean-clone Judge result.
+**Delta 000 — restore reproducible pinned Vivari source** is complete. It was a supply-chain/configuration task, not a semantic runtime rewrite. The public-origin failure remains directly observed, while the owner-controlled mirror now has a deterministic credentialed clean-fetch proof. Bolt-facing work remains separately gated by its explicit integration scope.
 
 ## Sources
 

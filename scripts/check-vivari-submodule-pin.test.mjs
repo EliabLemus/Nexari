@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { PINNED_VIVARI_SHA, validatePinnedVivariSubmodule } from './check-vivari-submodule-pin.mjs';
+import {
+  PINNED_VIVARI_SHA,
+  VIVARI_MIRROR_URL,
+  validatePinnedVivariProvenance,
+  validatePinnedVivariSubmodule,
+} from './check-vivari-submodule-pin.mjs';
 
 const expectedGitlink = `160000 commit ${PINNED_VIVARI_SHA}\truntime/vivari`;
 
@@ -28,5 +33,29 @@ test('rejects a checkout that differs from the committed gitlink', () => {
       submoduleHead: '0'.repeat(40),
     }),
     /HEAD must remain/,
+  );
+});
+
+test('accepts only the owner-controlled mirror with no tracking branch', () => {
+  assert.doesNotThrow(() => validatePinnedVivariProvenance({
+    submoduleUrl: VIVARI_MIRROR_URL,
+    submoduleBranch: '',
+  }));
+});
+
+test('rejects the retired public upstream or a branch that could drift', () => {
+  assert.throws(
+    () => validatePinnedVivariProvenance({
+      submoduleUrl: 'https://github.com/maitrungduc1410/vivari.git',
+      submoduleBranch: '',
+    }),
+    /owner-controlled mirror/,
+  );
+  assert.throws(
+    () => validatePinnedVivariProvenance({
+      submoduleUrl: VIVARI_MIRROR_URL,
+      submoduleBranch: 'master',
+    }),
+    /must not track a branch/,
   );
 });

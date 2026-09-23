@@ -11,12 +11,12 @@
   - pinned upstream commit: `2e254ac19a696394030601bc602f54945b12bfc4`
 - **Read-only pinned Vivari recovery reference:** `/Users/openjaime/Projects/nexari-vivari-pinned-reference`
   - preserves Nexari's locally available submodule commit `210d50d3f314b1fc6b148776ee24c2d48d8d022d`.
-- **P0 environment blocker:** a clean `git submodule update --init --recursive` cannot obtain that SHA from the public upstream configured in `.gitmodules`. The integration worktree must not build against its accidentally fetched substitute checkout.
+- **Pinned source provenance:** `runtime/vivari` now resolves through the owner-controlled private mirror `EliabLemus/nexari-vivari-provenance-20260922`. The exact gitlink remains the reviewed SHA; credentialed CI must be granted read access to this private repository.
 - No Bolt application files, runtime implementation files, environment files, credentials, remotes, or deployments have been changed.
 
 ## Delta 000 — Restore reproducible pinned Vivari source
 
-**Status:** Blocked — the public origin does not currently serve the exact pin to a clean repository; durable supply-chain ownership requires an owner decision
+**Status:** Complete — the public origin remains historically unavailable, but the reviewed pin is preserved in an owner-controlled private mirror and independently retrievable by credentialed clean repositories.
 
 **Objective:** Make the exact runtime source checked out by Nexari reproducible on a clean machine and CI.
 
@@ -28,11 +28,13 @@
 
 **Required decision for durable CI/release:** provide an owner-controlled immutable mirror or private fork containing `210d50d3f314b1fc6b148776ee24c2d48d8d022d`. Do not replace the pin with a current public upstream tip merely to unblock checkout. Bolt-facing code remains blocked pending that durability decision; the current observation permits only reversible local source/test work.
 
-**Current mirror candidate (not yet adopted):** GitHub REST creation returned `EliabLemus/nexari-vivari-provenance-20260922` on 2026-09-22, but the subsequent authenticated Git publication attempt failed with `403 Write access to repository not granted`. This is not mirror evidence. Do not change `.gitmodules` or the provenance ledger to this URL until the exact pin has passed an empty-repository fetch from it.
+**Historical mirror failure (preserved):** GitHub REST creation returned `EliabLemus/nexari-vivari-provenance-20260922` on 2026-09-22, but an earlier authenticated Git publication attempt failed with `403 Write access to repository not granted`. It was not evidence of retrievability.
+
+**Mirror adoption proof (2026-09-22T22:15:49-0600):** after owner authorization, the exact object was published as `refs/heads/provenance/pinned-210d50d3f314` in `https://github.com/EliabLemus/nexari-vivari-provenance-20260922.git`. An ephemeral empty repository, using this machine's authorized Git credentials, fetched that ref and resolved `FETCH_HEAD` to `210d50d3f314b1fc6b148776ee24c2d48d8d022d`; `git fsck --no-dangling --no-progress` passed. `.gitmodules` now uses this mirror with no branch-tracking key, so the committed gitlink is authoritative. Private CI must use a credential with read access to this mirror.
 
 **Verification:**
 ```text
-npm run check:vivari-submodule-pin  # committed gitlink and checkout remain the exact pin
+npm run check:vivari-submodule-pin  # owner-controlled mirror plus committed gitlink/checkout remain exact
 rm -rf <fresh-clone>
 git clone --recurse-submodules <Nexari fork> <fresh-clone>
 git -C <fresh-clone>/runtime/vivari rev-parse HEAD  # exact approved SHA
@@ -40,7 +42,7 @@ git -C <fresh-clone> status --short                 # clean
 npm ci && npm run build:vivari && npm run build
 ```
 
-**Acceptance:** a fresh clone obtains the reviewed SHA without local object sharing, and the provenance guard identifies the exact source/mirror.
+**Acceptance:** a credentialed fresh clone obtains the reviewed SHA without local object sharing, and the provenance guard identifies the exact source/mirror without tracking a mutable branch.
 
 ## Delta 001 — Freeze the observed Bolt runtime seam
 
