@@ -1,12 +1,12 @@
 # DELTAS — SPEC-002 Bolt.DIY → Nexari Runtime Integration
 
-**Status:** Prepared. All code deltas are blocked pending owner go-ahead.
+**Status:** In progress. Reversible Nexari-side contract and adapter work is authorized; no Bolt checkout integration, remote publication, deployment, or runtime pin change is authorized.
 
 ## Environment prepared
 
 - **Nexari integration worktree:** `/Users/openjaime/Projects/nexari-boltdiy-integration`
   - branch: `nexari/boltdiy-integration-spec-20260920`
-  - base: `0e1c8d0`
+  - current verified terminal-seam commit: `1f1684c9e432d3e790354ef5cf5a18797fe24146`
 - **Read-only Bolt.DIY reference:** `/Users/openjaime/Projects/bolt.diy-nexari-reference`
   - pinned upstream commit: `2e254ac19a696394030601bc602f54945b12bfc4`
 - **Read-only pinned Vivari recovery reference:** `/Users/openjaime/Projects/nexari-vivari-pinned-reference`
@@ -44,7 +44,7 @@ npm ci && npm run build:vivari && npm run build
 
 ## Delta 001 — Freeze the observed Bolt runtime seam
 
-**Status:** Ready to start after approval
+**Status:** Nexari-side seam inventory and owned contract are complete. Bolt application call-site migration remains blocked by Delta 000's reproducible-source decision and the separately scoped Bolt integration work.
 
 **Objective:** Turn actual Bolt call sites into a narrow, explicit compatibility interface and prove the baseline before swapping any backend.
 
@@ -64,7 +64,7 @@ npm ci && npm run build:vivari && npm run build
 
 ## Delta 002 — P0 terminal feasibility spike
 
-**Status:** Spike complete; contract tests green (6/6). Delta 001 remains the prerequisite for facade implementation.
+**Status:** Complete on the Nexari side. The JSH/OSC spike and replacement adapter are both committed; they do not integrate into the Bolt checkout.
 
 **Objective:** Resolve the difference between Bolt's `/bin/jsh --osc` protocol and Nexari's proven interactive `sh` before any broad refactor.
 
@@ -81,7 +81,9 @@ npm ci && npm run build:vivari && npm run build
 
 **Acceptance:** The test does not rely on an OSC sequence unless Nexari demonstrably emits it. Commands report exit code/output and a stale/aborted command cannot revive the UI.
 
-**Spike outcome (2026-09-22, kernel-level, pinned submodule 210d50d):** Nexari's clean-room `sh` does **not** emit OSC 654, and the interactive REPL never surfaces exit codes (`drain()` discards `runLine`'s status; no `$?` expansion). The replacement contract is now pinned by `scripts/check-bolt-terminal-contract.test.mjs` (wired into `npm test`; 6 tests, green): readiness gates on the one-time banner `Vivari shell — type commands, Enter to run.\n` plus structural ANSI prompt draws (no byte-exact prompt pin); the command lane is echoed output followed by a later prompt redraw (the `waitTillOscCode('prompt')` replacement); exit codes ride the separate `sh -c` exec lane via `kernel.start` (success leg pinned here; exit-3 and typed-127 legs remain pinned by `scripts/check-runtime-shell-coreutils.test.mjs`); Ctrl+C SIGINTs the foreground child, restores the prompt, and the REPL stays answerable — with the numeric child exit code deliberately unasserted because the REPL cannot surface it; stale `sendStdin` to a stopped/unknown pid returns `false` and revives nothing. Every test also asserts the stream contains no `\x1b]654;` sequence, making "no OSC dependency" falsifiable. Challenger pre-mortem verdict: `REVISE_CONTRACT`; all five risk clusters (banner-over-prompt gate, two-lane cwd/env divergence, honest AC-4 observables, uncaptured stdin lane with `finally` teardown, duplicate/negative-case trimming) were accepted and are reflected in the test file. Facade design consequence: Bolt's `BoltShell` must be replaced behind the facade (prompt-gated interactive lane + `sh -c` exit-capture lane), not emulated with OSC.
+**Spike outcome (2026-09-22, kernel-level, pinned submodule `210d50d`):** Nexari's clean-room `sh` does **not** emit OSC 654, and the interactive REPL never surfaces exit codes (`drain()` discards `runLine`'s status; no `$?` expansion). `scripts/check-bolt-terminal-contract.test.mjs` pins the replacement protocol (six tests, wired into `npm test`): readiness is the one-time banner `Vivari shell — type commands, Enter to run.\n` plus structural ANSI prompt draws; command completion is echoed output followed by a later prompt redraw; exit codes use a separate `sh -c` exec lane; Ctrl+C restores the prompt and the REPL remains answerable; stale `sendStdin` is inert. Every test asserts the stream contains no `\x1b]654;` sequence.
+
+The executable adapter is committed in `1f1684c` as `packages/vivari-adapter/src/terminal-seam.ts`. It creates an option-less interactive `sh` REPL exposing raw guest output and a distinct `sh -c` execution lane that returns split stdout/stderr plus the numeric exit code, forwarding only explicit `cwd`, `env`, and `signal`. Its focused adapter tests cover stale/idempotent REPL teardown, rejected exit/stdin, split output/non-zero exit, explicit option forwarding, stream failure propagation, and pre-aborted exec requests. The final Challenger review returned `PASS`; its only observations were non-blocking optional hardening for stream-failure cleanup and pre-existing script wiring scope. Facade design consequence: Bolt's `BoltShell` must be replaced behind the facade (prompt-gated interactive lane + `sh -c` exit-capture lane), not emulated with OSC.
 
 ## Delta 003 — Backend selector and facade
 
