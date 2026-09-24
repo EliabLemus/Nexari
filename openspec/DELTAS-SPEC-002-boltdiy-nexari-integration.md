@@ -89,7 +89,7 @@ The executable adapter is committed in `1f1684c` as `packages/vivari-adapter/src
 
 ## Delta 003 — Backend selector and facade
 
-**Status:** Not started — Delta 001 and Delta 002 are complete on the Nexari side. This requires an explicitly authorized Bolt checkout/fork integration scope, an integration ownership decision, and an opt-in selector design that preserves the default WebContainer path.
+**Status:** Implemented on the Bolt integration fork (local branch `nexari/runtime-facade-slice-001`, HEAD `986cbfc`, 2026-09-24) — final guest injection and any runtime cutover remain owner-gated. Delta 001 and Delta 002 were complete on the Nexari side; the Bolt-side selector/facade slice is code-complete with deterministic gates green, and all 17 Bolt compatibility rows (BOLT-WC-001…017) are browser-proven in `compatibility/bolt-compatibility-matrix.md`.
 
 **Objective:** Add an explicit `nexari` development backend behind a default-preserving selector.
 
