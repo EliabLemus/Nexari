@@ -46,10 +46,20 @@ export interface VivariSdk {
   boot(options?: { signal?: AbortSignal; previewOrigin?: string }): Promise<VivariLike>;
 }
 
+/**
+ * Relaxed SDK contract for injected loaders. The adapter validates the booted
+ * guest structurally at boot time (see assertVivariLike), so hosts that erase
+ * the SDK's concrete type — as the Bolt fork's boot seam does — can inject
+ * their loader without a cast while the pinned loader keeps full typing.
+ */
+export interface VivariSdkLike {
+  boot(options?: { signal?: AbortSignal; previewOrigin?: string }): Promise<unknown>;
+}
+
 export interface VivariAdapterOptions {
   id: string;
   isIsolated?: () => boolean;
-  loadSdk: () => Promise<VivariSdk>;
+  loadSdk: () => Promise<VivariSdkLike>;
 }
 
 // One host preview element can be reused by a fresh runtime after an older
@@ -102,13 +112,13 @@ class NexariVivariRuntime implements BrowserRuntime {
   #bootWorkdirName: string | undefined;
   #forwardPreviewErrors = false;
   #previewDiagnosticListeners = new Set<(diagnostic: RuntimePreviewDiagnostic) => void>();
-  #guestBootPromise: Promise<VivariLike> | undefined;
+  #guestBootPromise: Promise<unknown> | undefined;
   #guestBootInFlight = false;
   #bootAbortController: AbortController | undefined;
   #teardownPromise: Promise<void> | undefined;
   #teardownFailed = false;
   #isIsolated: () => boolean;
-  #loadSdk: () => Promise<VivariSdk>;
+  #loadSdk: () => Promise<VivariSdkLike>;
 
   constructor({ id, isIsolated = defaultIsolation, loadSdk }: VivariAdapterOptions) {
     this.id = id;
@@ -307,7 +317,11 @@ class NexariVivariRuntime implements BrowserRuntime {
       this.#guestBootInFlight = true;
       let instance: VivariLike;
       try {
-        instance = await this.#guestBootPromise;
+        // The relaxed SDK contract returns an unknown guest. Validate the
+        // structural contract here, at the single trust boundary, so every
+        // later consumer (ready gate, teardown, fs, spawn, events) can rely
+        // on the concrete VivariLike shape without re-checking it.
+        instance = assertVivariLike(await this.#guestBootPromise);
       } finally {
         this.#guestBootInFlight = false;
       }
@@ -698,6 +712,35 @@ class NexariVivariRuntime implements BrowserRuntime {
 
 function defaultIsolation(): boolean {
   return typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined';
+}
+
+const requiredGuestFsMembers = ['readFile', 'writeFile', 'readdir', 'mkdir', 'rm'] as const;
+
+/**
+ * Validate that an unknown guest returned by an injected SDK satisfies the
+ * structural contract the adapter relies on. Fails boot with a typed error
+ * instead of trusting a malformed instance into #instance.
+ */
+function assertVivariLike(value: unknown): VivariLike {
+  if (!value || typeof value !== 'object') {
+    throw new RuntimeError('BOOT_FAILED', 'Pinned SDK returned an invalid runtime instance: expected an object');
+  }
+  const guest = value as Record<string, unknown>;
+  const fs = guest.fs as Record<string, unknown> | undefined;
+  if (!fs || typeof fs !== 'object') {
+    throw new RuntimeError('BOOT_FAILED', 'Pinned SDK returned an invalid runtime instance: missing fs');
+  }
+  for (const member of requiredGuestFsMembers) {
+    if (typeof fs[member] !== 'function') {
+      throw new RuntimeError('BOOT_FAILED', `Pinned SDK returned an invalid runtime instance: fs.${member} is not a function`);
+    }
+  }
+  for (const member of ['spawn', 'teardown'] as const) {
+    if (typeof guest[member] !== 'function') {
+      throw new RuntimeError('BOOT_FAILED', `Pinned SDK returned an invalid runtime instance: ${member} is not a function`);
+    }
+  }
+  return value as VivariLike;
 }
 
 function isVivariCommandNotFound(cause: unknown): cause is Error & { code: 'ERR_COMMAND_NOT_FOUND' } {
