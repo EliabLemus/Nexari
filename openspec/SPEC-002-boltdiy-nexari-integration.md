@@ -1,6 +1,13 @@
 # SPEC-002: Bolt.DIY → Nexari Runtime Integration
 
-**Status:** Planned — code changes require explicit owner go-ahead.
+**Status:** Approved — owner decisions resolved 2026-09-25 (see Owner decisions, below). Implementation proceeds on the private fork; upstream push still requires explicit owner go-ahead.
+
+## Owner decisions (resolved 2026-09-25)
+
+1. **Integration ownership:** private fork. EXECUTED: `EliabLemus/bolt-diy-nexari-runtime` (private), pushed at `1c481c7` with full history (unshallowed from upstream `2e254ac`, which is still upstream HEAD — no rebase needed).
+2. **Full WebContainer replacement:** the goal is to replace WebContainer entirely, not to keep a dual-backend flag forever. The runtime facade/backend selector is the migration path; remaining surfaces to port to Nexari (currently fail-closed): preview, filesystem watchers, search, deploy, interactive terminal. `VITE_RUNTIME_BACKEND` remains as migration switch and is removed only when all surfaces pass acceptance on Nexari.
+3. **Preview hosting:** Tailscale Funnel + Caddy pattern (same as Pulse), dedicated preview domain with wildcard/port routing, without disturbing existing publications. Exact domain to be chosen at implementation time (proposal: `preview.nexus-2.tailf73d68.ts.net`).
+4. **Dependency form:** versioned tarball package (not submodule, not workspace nesting).
 
 ## Goal
 
