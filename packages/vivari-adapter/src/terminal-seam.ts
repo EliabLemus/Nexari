@@ -4,7 +4,7 @@ import type {
   ExecCaptureOptions,
   ExecCaptureResult,
   RuntimeProcess,
-} from '../../runtime-contract/dist/index.js';
+} from '@nexari/runtime-contract';
 
 /**
  * Create the proven Delta 002 replacement for Bolt's JSH/OSC terminal protocol.

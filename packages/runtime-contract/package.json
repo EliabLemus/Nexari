@@ -3,5 +3,14 @@
   "version": "0.1.0-dev",
   "private": true,
   "type": "module",
-  "exports": "./dist/index.js"
+  "files": [
+    "dist"
+  ],
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  }
 }

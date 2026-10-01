@@ -14,7 +14,7 @@ import {
   type RuntimeEventMap,
   type RuntimePreviewDiagnostic,
   type RuntimeTerminalDimensions,
-} from '../../runtime-contract/dist/index.js';
+} from '@nexari/runtime-contract';
 
 export interface VivariLike {
   /** Narrow view of the owned fork API; the host contract is adapted below. */
@@ -73,7 +73,7 @@ export function createVivariRuntime(options: VivariAdapterOptions): BrowserRunti
 
 /** The sole fork-specific import seam; host applications only call the adapter API. */
 export async function loadPinnedVivariSdk(): Promise<VivariSdk> {
-  const { Vivari } = await import('../../../runtime/vivari/packages/core/dist/index.js');
+  const { Vivari } = await import('@vivari/core');
   return { boot: (options) => Vivari.boot(options) };
 }
 
@@ -83,7 +83,7 @@ export async function loadPinnedVivariSdk(): Promise<VivariSdk> {
  * project storage.
  */
 export async function resetPinnedVivariVfs(): Promise<boolean> {
-  const { resetVfs } = await import('../../../runtime/vivari/packages/core/dist/index.js');
+  const { resetVfs } = await import('@vivari/core');
   return resetVfs();
 }
 
