@@ -26,7 +26,7 @@ if (source.includes("}, { once: true });")) {
   throw new Error('browser lab must not discard its teardown handler after a failed cleanup retry path');
 }
 const adapter = await readFile(path.join(root, 'packages', 'vivari-adapter', 'src', 'index.ts'), 'utf8');
-for (const needle of ["import('../../../runtime/vivari/packages/core/dist/index.js')", 'Vivari.boot', 'server-ready']) {
+for (const needle of ["await import('@vivari/core')", 'Vivari.boot', 'server-ready']) {
   if (!adapter.includes(needle)) throw new Error(`adapter must own the Vivari SDK seam for ${needle}`);
 }
 for (const relative of ['labs/browser-smoke/src/main.ts', 'labs/browser-smoke/src/sdk.ts']) {
