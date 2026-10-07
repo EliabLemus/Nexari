@@ -21,6 +21,8 @@
     "test:release-version": "node --test scripts/check-release-version.test.mjs",
     "test:workflow-safety": "node --test scripts/check-workflow-safety.test.mjs",
     "build:vivari": "node scripts/build-vivari.mjs",
+    "build:browser-assets": "node packages/vivari-browser-assets/build.mjs",
+    "test:browser-assets": "npm run build:browser-assets && node --test scripts/vivari-browser-assets.test.mjs",
     "test:runtime-contract": "tsc -p packages/runtime-contract/tsconfig.json && node --test packages/runtime-contract/test/runtime-contract.test.mjs packages/runtime-contract/test/terminal-seam-contract.test.mjs",
     "test:vivari-adapter": "npm run build:vivari && tsc -p packages/runtime-contract/tsconfig.json && npm run link:package-aliases && tsc -p packages/vivari-adapter/tsconfig.json && node --test packages/vivari-adapter/test/vivari-adapter.test.mjs packages/vivari-adapter/test/vivari-sdk-linkage.test.mjs packages/vivari-adapter/test/vivari-sdk-shape-validation.test.mjs packages/vivari-adapter/test/terminal-seam.test.mjs packages/vivari-adapter/test/packability.test.mjs",
     "link:package-aliases": "node scripts/link-package-aliases.mjs",
