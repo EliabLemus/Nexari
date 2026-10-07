@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { execFile as execFileCallback } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -12,6 +13,7 @@ const packages = [
   { name: '@nexari/runtime-contract', dir: 'packages/runtime-contract', allowed: /^(package\.json|dist\/.+)$/ },
   { name: '@vivari/core', dir: 'runtime/vivari/packages/core', allowed: /^(package\.json|README\.md|dist\/.+)$/ },
   { name: '@nexari/vivari-adapter', dir: 'packages/vivari-adapter', allowed: /^(package\.json|dist\/.+)$/ },
+  { name: '@nexari/vivari-browser-assets', dir: 'packages/vivari-browser-assets', allowed: /^(package\.json|dist\/.+)$/, staticPayload: true },
 ];
 
 async function packOne(pkg) {
@@ -28,10 +30,27 @@ async function packOne(pkg) {
   if (unexpected.length) {
     throw new Error(`${pkg.name}: unexpected packed files: ${unexpected.join(', ')}`);
   }
-  if (!entry.files.some((file) => file.path === 'dist/index.js')) {
+  if (!pkg.staticPayload && !entry.files.some((file) => file.path === 'dist/index.js')) {
     throw new Error(`${pkg.name}: tarball lacks dist/index.js`);
   }
-  return { name: pkg.name, filename: entry.filename, version: entry.version, files: entry.files.map((file) => file.path) };
+
+  const distFiles = entry.files.map((file) => file.path).filter((file) => file.startsWith('dist/'));
+  if (pkg.staticPayload && !distFiles.length) {
+    throw new Error(`${pkg.name}: tarball lacks static dist payload`);
+  }
+
+  const sha256 = (contents) => createHash('sha256').update(contents).digest('hex');
+  const files = Object.fromEntries(
+    await Promise.all(distFiles.map(async (file) => [file, sha256(await readFile(path.join(cwd, file)))])),
+  );
+
+  return {
+    name: pkg.name,
+    filename: entry.filename,
+    version: entry.version,
+    sha256: sha256(await readFile(path.join(outputDir, entry.filename))),
+    files,
+  };
 }
 
 await rm(outputDir, { recursive: true, force: true });
@@ -42,6 +61,7 @@ for (const pkg of packages) manifest.push(await packOne(pkg));
 const adapter = manifest.find((pkg) => pkg.name === '@nexari/vivari-adapter');
 const contract = manifest.find((pkg) => pkg.name === '@nexari/runtime-contract');
 const core = manifest.find((pkg) => pkg.name === '@vivari/core');
+const assets = manifest.find((pkg) => pkg.name === '@nexari/vivari-browser-assets');
 const adapterManifest = JSON.parse(await readFile(path.join(repoRoot, 'packages/vivari-adapter/package.json'), 'utf8'));
 if (adapterManifest.dependencies?.['@nexari/runtime-contract'] !== contract.version || adapterManifest.dependencies?.['@vivari/core'] !== core.version) {
   throw new Error('adapter dependencies must pin the packed runtime-contract and Vivari core versions exactly');
@@ -56,6 +76,7 @@ try {
     path.join(outputDir, contract.filename),
     path.join(outputDir, core.filename),
     path.join(outputDir, adapter.filename),
+    path.join(outputDir, assets.filename),
   ], { cwd: consumer, maxBuffer: 10 * 1024 * 1024 });
   await execFile('node', ['--input-type=module', '--eval', "await import('@nexari/vivari-adapter')"], { cwd: consumer });
 } finally {
