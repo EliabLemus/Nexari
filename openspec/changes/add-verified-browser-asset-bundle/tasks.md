@@ -5,5 +5,5 @@
 - [x] Extend clean-consumer verification to install and resolve the fourth tarball without producer paths.
 - [x] Add a Bolt host asset-serving plugin that resolves only the installed static package, serves correct headers in development, and copies identical bytes into production output. Add path traversal and byte-identity tests first.
 - [x] Replace the untracked hand-copied Bolt `public/` experiment with the verified host integration.
-- [ ] Run producer package tests, Bolt focused tests/lint/typecheck, production-build asset probe, isolated Chrome Nexari boot E2E, `git diff --check`, and a final frozen-diff review.
+- [x] Run producer package tests, Bolt focused tests/lint/typecheck, production-build asset probe, isolated Chrome Nexari boot E2E, `git diff --check`, and a final frozen-diff review.
 - [x] Commit producer and host slices separately. Do not push or deploy without explicit authorization.
