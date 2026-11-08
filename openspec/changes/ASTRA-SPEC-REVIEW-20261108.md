@@ -78,3 +78,11 @@ Los ajustes mínimos siguientes se expresan como condiciones del contrato y de a
 - **Generación real:** prompt y modelo efectivos, artefacto íntegro tras streaming, manifiesto recibido por el guest, caso estático y compatibilidad en ambos backends. Encontrar una cadena en el prompt no sustituye ninguno.
 - **Preview completo:** bind sin respuesta, petición colgada, significado de 404/500, cierre/reapertura, desuscripción, render de contenido identificable y edición visible. El control de ausencia de StackBlitz debe cubrir iframe y workers: `performance.getEntriesByType('resource')` del documento principal no acredita por sí solo todo el tráfico.
 
+**4. Veredicto por spec**
+
+| Spec | Veredicto | Justificación |
+|---|---|---|
+| `add-wasm-safe-start-pipeline` | **REWORK** | Escenario, tareas y tests discrepan en la secuencia central, y output/cancelación no quedan satisfechos por el flujo real. |
+| `add-wasm-compatible-starter-guidance` | **SHIP-CON-FIXES** | La guía condicional existe, pero requiere alcance efectivo del prompt, compatibilidad acotada y evidencia de generación antes de cerrar aceptación. |
+| `add-nexari-preview-bridge` | **REWORK** | El SDK aporta readiness HTTP, pero el consumidor publica disponibilidad desde el bind y deja sin acreditar transporte completo, desuscripción y actualización del preview. |
+tokens used
