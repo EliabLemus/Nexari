@@ -25,6 +25,16 @@ La superficie nexari SHALL emitir un evento `server-ready(port, baseUrl)` solo c
 - **WHEN** el backend es nexari y llega `server-ready`
 - **THEN** el iframe del Preview carga la baseUrl y renderiza la app generada.
 
+#### Scenario: la disponibilidad del preview depende de readiness HTTP, no del bind
+
+- **WHEN** el server in-VM abre el puerto (`port: open`) pero aún no responde HTTP
+- **THEN** la entrada puede registrarse con `ready=false` y el Preview conserva "No preview available"; solo `server-ready` marca `ready=true` e inserta la entrada si no existe.
+
+#### Scenario: desuscripción corta las entregas
+
+- **WHEN** un consumidor se desuscribe vía la función retornada por la superficie nexari
+- **THEN** el listener no recibe emisiones posteriores, verificado a través de la fachada real (no de un fake).
+
 #### Scenario: backend stackblitz sin regresión
 
 - **WHEN** el backend es stackblitz

@@ -9,7 +9,13 @@ El sistema SHALL reescribir todo comando recibido en `executeCommand` que matche
 #### Scenario: start action del artefacto se reescribe
 
 - **WHEN** el action-runner ejecuta el comando `npm install && npm run dev` vía `createNexariActionShell`
-- **THEN** el guest ejecuta la secuencia completa: `npm install --ignore-scripts`, luego `npm install --no-save --ignore-scripts esbuild@0.28.2 @rollup/wasm-node`, luego el swap de `node_modules/rollup` por `@rollup/wasm-node` vía `node -e fs.cpSync`, y finalmente `npm run dev`; el output mostrado en el terminal es el de la secuencia reescrita, no del comando original.
+- **THEN** el guest ejecuta la secuencia COMPLETA de 4 pasos desde estado limpio: `npm install --ignore-scripts`, luego `npm install --no-save --ignore-scripts esbuild@0.28.2 @rollup/wasm-node`, luego el swap de `node_modules/rollup` por `@rollup/wasm-node` vía `node -e fs.cpSync`, y finalmente `npm run dev`; el output mostrado en el terminal refleja cada paso ejecutado.
+
+#### Scenario: comandos con paquetes, cadenas o flags preservan la intención
+
+- **WHEN** el comando es `npm install vite`, `npm run build && npm run preview`, o `npm run dev -- --host 0.0.0.0`
+- **THEN** ninguna reescritura elimina paquetes u operaciones solicitadas: `npm install vite` instala `vite` (con los pasos wasm añadidos por ser bundler nativo); la cadena ejecuta AMBAS operaciones reescritas; los flags tras `--` se conservan en el paso final.
+- **AND** las formas no reconocidas (p. ej. `yarn dev`) pasan crudas sin reescritura.
 
 #### Scenario: comandos no-proyecto pasan intactos
 
