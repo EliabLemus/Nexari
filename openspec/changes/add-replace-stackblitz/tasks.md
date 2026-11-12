@@ -721,6 +721,28 @@ Escenarios: S12, S14, S15, S16, S21, S23 y S24.
 
 ## T12 — Verificar cero dominios StackBlitz y decidir cierre
 
+Registro de la ejecución del fix del parser (apéndice T12, 2026-11-11):
+
+- Checkout APP: `~/.worktrees/subagent-sa-0-7500bd9c`, rama
+  `hermes-subagent/subagent-sa-0-7500bd9c`, commit `288e2332`
+  ("fix(parser): synthetic boltArtifact wrapper for bare boltAction streams").
+- Causa raíz confirmada: el stream real capturado
+  (`scripts/chat-stream.txt`, Ollama/qwen3:4b-64k) contiene
+  `<boltAction>` SIN `<boltArtifact>` → `onArtifactOpen` nunca dispara y
+  el workbench no monta.
+- Fix: `EnhancedStreamingMessageParser` inyecta un `<boltArtifact>`
+  sintético antes del primer `<boltAction>` desnudo; como el parser base es
+  un escáner acumulativo con cursor por mensaje y `useMessageParser`
+  concatena el output devuelto, la inyección es estable en re-parses
+  acumulativos y el output ya emitido se suprime con un contador por
+  mensaje (sin duplicar texto en el chat).
+- Evidencia: `app/lib/runtime/enhanced-message-parser.capture.spec.ts`
+  repite el stream REAL capturado y acredita 1 `artifactOpen`,
+  4 `actionOpen:file`, `actionClose:shell` — PASS (antes: 0 callbacks).
+- Gates: suite completa 268/268 PASS; `pnpm run typecheck` PASS
+  (exit 0). Dev server del puerto 5173 (PID 38560) eliminado al terminar;
+  puerto libre verificado.
+
 - [ ] 12.1 Capturar tráfico desde antes de navegar hasta terminar T10/T11.
 
 La captura debe incluir:
@@ -836,4 +858,44 @@ Cierre exacto:
 Si falta navegador vivo, el resultado final será:
 “Contrato consolidado; aceptación E2E pendiente”.
 Nunca “implementación verificada” ni “cambio cerrado”.
+
+### 12.4.a — Matriz S01–S26 (ejecución 2026-11-11)
+
+Evidencia base: rama `hermes-subagent/subagent-sa-0-7500bd9c`, commit
+`288e2332`; suite completa `pnpm test` 268/268 PASS y `pnpm run typecheck`
+PASS sobre ese checkout; sin navegador vivo en la sesión.
+
+| Escenario | Evidencia | Estado | Observación |
+|---|---|---|---|
+| S01 | runtime-selector/browser-runtime/composition specs dentro de suite 268 PASS | PASS (estructural) | fallback StackBlitz ausente en perfil nexari |
+| S02 | — | NO-VERIFICABLE-E2E | requiere captura de red con navegador vivo |
+| S03 | vivari-guest-factory/nexari-app-boot/nexari-runtime specs PASS | PASS (test) | boot devuelve guest adaptado |
+| S04 | nexari-runtime-facade spec PASS | PASS (test) | sh -c con stdout/stderr/exit |
+| S05 | nexari-action-shell spec PASS (estructura I→W→R) | PASS (estructura) | pipeline completo limpio: NO-VERIFICABLE-E2E |
+| S06 | nexari-action-shell spec PASS | PASS (test) | casos y flags conservados |
+| S07 | nexari-terminal/action-runner specs PASS | PASS (test) | presentación visual: NO-VERIFICABLE-E2E |
+| S08 | — | NO-VERIFICABLE-E2E | requiere servidor vivo en guest |
+| S09 | previews spec PASS (port:open ready=false) | PASS (store) | transporte real: NO-VERIFICABLE-E2E |
+| S10 | gate de lectura T05 (rama `process.exit.then` llama settle) | FAIL (lectura) | requiere eliminar esa ruta; no re-verificada en esta sesión |
+| S11 | — | NO-VERIFICABLE-E2E | progreso visible requiere navegador |
+| S12 | — | NO-VERIFICABLE-E2E | separación manual/acción requiere navegador |
+| S13 | nexari-action-shell spec PASS (fallo detiene pipeline) | PASS (test) | — |
+| S14 | then(callback, callback) acreditado; cola completa: WorkbenchStore no probado entero | PASS (estructural) | verificación E2E pendiente (T11.2) |
+| S15 | specs adapter PASS; cancelación real | NO-VERIFICABLE-E2E | — |
+| S16 | — | NO-VERIFICABLE-E2E | reintento requiere navegador |
+| S17 | optimized.test.ts PASS (guía condicional presente) | PASS (textual) | promptId efectivo en solicitud: NO-EJECUTADO |
+| S18 | — | NO-VERIFICABLE-E2E | manifiesto íntegro en guest requiere E2E |
+| S19 | capture spec: stream real replay acredita callbacks tras el fix | PASS (parser) | streaming E2E observable: NO-VERIFICABLE-E2E |
+| S20 | nexari-runtime-facade/previews specs PASS | PASS (test) | — |
+| S21 | lectura T08: Preview.tsx no consulta `ready` | FAIL (estructural) | UI exige cambio en Preview.tsx |
+| S22 | previews spec PASS (server-ready sin duplicar) | PASS (test) | — |
+| S23 | specs de store PASS; 404/500/colgado reales | NO-VERIFICABLE-E2E | — |
+| S24 | — | NO-VERIFICABLE-E2E | ciclo de preview requiere navegador |
+| S25 | generación real bloqueada por parser — FIX aplicado y acreditado (commit 288e2332, capture spec PASS) | NO-VERIFICABLE-E2E | el bloqueo "stream llega y no renderiza" está resuelto a nivel parser; falta E2E completo |
+| S26 | T01 no ejecutado en esta sesión; dev server obsoleto (PID 38560, :5173) eliminado y puerto libre verificado | NO-EVALUADO | procedencia completa requiere re-ejecutar T01 |
+
+Veredicto: “Contrato consolidado; aceptación E2E pendiente”. El gate de
+parser (S19/S25) quedó acreditado con el stream real capturado; ningún
+estado se promovió sin evidencia directa.
+
 ````
