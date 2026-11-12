@@ -786,6 +786,38 @@ Registro del segundo intento E2E con navegador vivo (apéndice T12,
   `nexari-rework-evidence-T06-T10-parcial.md` (worktree APP, commit
   `ddc84d2a`).
 
+Registro de la tercera pasada E2E con modelo recargado (apéndice T12,
+2026-11-11, tercera pasada delegada):
+
+- Desbloqueo previo: `ollama stop qwen3:4b-64k` (exit 0) para forzar
+  recarga con el `num_ctx 65536` del modelfile; verificado via
+  `/api/ps` tras carga manual: `context_length: 65536`.
+- **Causa raíz REAL hallada en código**: `app/lib/modules/llm/providers/
+  ollama.ts:131` envía `numCtx: getDefaultNumCtx(serverEnv)`, que
+  devuelve **32768 por defecto** (env `DEFAULT_NUM_CTX` no seteada).
+  Cada request de la app re-carga el modelo a 32K aunque esté
+  precargado a 64K — `/api/ps` vuelve a 32768 en plena generación.
+- Mitigación intentada y fallida: dev server relanzado con
+  `DEFAULT_NUM_CTX=65536`; el contexto efectivo volvió a 32768 durante
+  la corrida (la env de proceso no llega al `serverEnv` efectivo en dev).
+- Setup: worktree APP `~/.worktrees/subagent-sa-0-7500bd9c`, backend
+  `nexari`, puerto 5173 strictPort, baseUrl sin barra final, cookies y
+  localStorage correctos, prompt `NEXARI-E2E-20261111-E1`.
+- Resultado: 2 intentos de navegador (límite consumido). Ambos:
+  "Analysing Request" con generación activa, luego clavados en
+  "Determining Files to Read" >3 min; `stream-recovery` timeouts y
+  "Max retries reached". Workbench nunca montó (0 iframes, 0 artifacts,
+  sin terminal). Evidencia: `nexari-rework-evidence-T06-T10-parcial.md`
+  (worktree APP, commit `bc01a8ac`).
+- Resultado tareas:
+  - 10.3–10.7: **NO-VERIFICABLE-E2E** (workbench no montó).
+  - 11.1–11.6: **NO-VERIFICABLE-E2E** (sin artefacto vivo).
+  - Ningún checkbox marcado como completado.
+- Desbloqueo real: hacer que el request incluya `num_ctx: 65536` —
+  propagar `DEFAULT_NUM_CTX` por la ruta que el runtime Nexari usa para
+  `serverEnv` (o cambiar el default de `getDefaultNumCtx`), verificando
+  `/api/ps` durante la generación.
+
 - [ ] 12.1 Capturar tráfico desde antes de navegar hasta terminar T10/T11.
 
 La captura debe incluir:
