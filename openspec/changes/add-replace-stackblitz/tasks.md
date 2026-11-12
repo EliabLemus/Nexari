@@ -456,7 +456,7 @@ Resultado exigido:
 - SharedArrayBuffer disponible;
 - Service Worker local correspondiente al paquete registrado.
 
-- [ ] 10.2 Solicitar generación real desde el chat.
+- [x] 10.2 Solicitar generación real desde el chat.
 
 Prompt de prueba:
 
@@ -817,6 +817,37 @@ Registro de la tercera pasada E2E con modelo recargado (apéndice T12,
   propagar `DEFAULT_NUM_CTX` por la ruta que el runtime Nexari usa para
   `serverEnv` (o cambiar el default de `getDefaultNumCtx`), verificando
   `/api/ps` durante la generación.
+
+Registro de la cuarta pasada E2E — **EXITOSA** (apéndice T12,
+2026-11-11, cuarta pasada delegada):
+
+- Desbloqueo aplicado: commit `8150a76c` (rama
+  `hermes-subagent/subagent-sa-0-7500bd9c`) «fix(ollama): default
+  numCtx 65536 (was 32768)» — `getDefaultNumCtx` devuelve 65536 por
+  defecto; ya no re-carga el modelo a 32K en cada request. Unit test
+  incluido.
+- Setup: worktree APP `~/.worktrees/subagent-sa-0-7500bd9c`, backend
+  `nexari`, puerto 5173 strictPort, baseUrl sin barra final, modelo
+  `qwen3:4b-64k`, prompt `NEXARI-E2E-20261111-E1` (React+Vite contador).
+- Resultado: **E2E exitosa**. Artifact del contador React creado,
+  workbench montado, usage real `promptTokens 5271 / completionTokens
+  4757`, ~18 tok/s, sin banner de error en la UI. Checkbox **10.2:
+  PASS**.
+- Intento 1 de la pasada falló con HTTP 400 "Token Limit Exceeded":
+  la cola de Ollama estaba ocupada por el propio probe de precarga —
+  no es un bug de la app. Intento 2 con la cola libre pasó.
+- `stream-recovery`: timeouts benignos durante la corrida (no
+  impidieron la finalización). **Ajuste del umbral de timeout queda
+  pendiente** como afinación; no bloquea la aceptación E2E.
+- Hallazgo benigno: `console.log` residual en el dist de
+  `ollama-ai-provider` (ruido de log, sin impacto funcional).
+- Alcance del marcado: solo 10.2 se marca `[x]` — la corrida acredita
+  generación real → artifact creado y montaje del workbench, pero las
+  comprobaciones ítem a ítem de 10.3–10.7 y 11.1–11.6 dentro del
+  artefacto vivo siguen pendientes de ejecución dedicada.
+- Evidencia: `nexari-rework-evidence-T06-T10-parcial.md` (worktree
+  APP, sección "cuarta pasada"). Dev server (PID 48201) eliminado al
+  terminar.
 
 - [ ] 12.1 Capturar tráfico desde antes de navegar hasta terminar T10/T11.
 
