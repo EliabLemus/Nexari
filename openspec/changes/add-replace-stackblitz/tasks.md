@@ -743,6 +743,49 @@ Registro de la ejecución del fix del parser (apéndice T12, 2026-11-11):
   (exit 0). Dev server del puerto 5173 (PID 38560) eliminado al terminar;
   puerto libre verificado.
 
+Registro del segundo intento E2E con navegador vivo (apéndice T12,
+2026-11-11, segunda pasada delegada):
+
+- Setup: worktree `~/.worktrees/subagent-sa-0-7500bd9c`
+  (`VITE_RUNTIME_BACKEND=nexari`, puerto 5173, strictPort), commit base
+  `288e2332`. Prompt `NEXARI-E2E-20261111-E1` (React+Vite+contador) con
+  `promptId=optimized`, provider Ollama, modelo `qwen3:4b-64k`,
+  `isDeveloperMode=true`.
+- **Hallazgo de configuración (trailing-slash)**: `baseUrl` del provider
+  Ollama con barra final (`http://localhost:11434/`) rompe la carga de
+  modelos dinámicos — el request redirige con 307 sin cabeceras CORS y el
+  navegador bloquea la respuesta. Con `baseUrl` SIN barra final
+  (`http://localhost:11434`) la carga de modelos funciona (3 modelos
+  dinámicos cacheados para Ollama). Registrado como requisito de setup.
+- Resultado de la corrida: el chat crea `/chat/15`, fase "Analysing
+  Request" y después queda clavada en "Determining Files to Read" >12 min.
+  El log del dev server muestra **Ollama HTTP 400 "Token Limit
+  Exceeded"**: `ollama api/ps` reporta `context_length: 32768` pese a que
+  el modelo derivado fue creado con `num_ctx 65536` (Ollama cargó el
+  modelo a 32K). El prompt optimizado (~28K tokens) + historial vuelve a
+  exceder el contexto. `stream-recovery` reintenta 2 veces con timeouts y
+  llega a "Max retries reached".
+- El workbench NUNCA montó: 0 iframes de preview, 0 artifacts, sin
+  terminal visible. Evidencia: captura de estado DOM de `/chat/15` +
+  log del dev server (sesión `proc_5edd81aa24f9`). Único intento de
+  navegador permitido consumido; segundo intento no ejecutado por estar
+  el bloqueo en el entorno (contexto Ollama), no en la UI.
+- Registro de tareas con lo observado:
+  - 10.2: **FAIL** — no se obtuvo completion real; la generación se
+    detuvo por el 400 de Ollama antes de emitir contenido incremental.
+  - 10.3–10.7: **NO-VERIFICABLE-E2E** — sin workbench montado no hay
+    guest, terminal ni iframe donde inspeccionar.
+  - 11.1–11.6: **NO-VERIFICABLE-E2E** — las pruebas requieren
+    ActionRunner y WorkbenchStore reales con un artefacto vivo; no se
+    alcanzó ese estado.
+  - Ninguno de estos checkboxes se marca como completado.
+- Desbloqueo propuesto: garantizar `num_ctx` efectivo ≥ 64K
+  (verificar con `ollama show qwen3:4b-64k | grep context_length` tras
+  recrear el modelo, o pasar `num_ctx` en `options` de `/api/chat`) y
+  relanzar el E2E. Detalle en
+  `nexari-rework-evidence-T06-T10-parcial.md` (worktree APP, commit
+  `ddc84d2a`).
+
 - [ ] 12.1 Capturar tráfico desde antes de navegar hasta terminar T10/T11.
 
 La captura debe incluir:
