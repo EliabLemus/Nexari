@@ -67,6 +67,7 @@ export default defineConfig({
     // vite 8 resolves @vivari/core to its .d.ts (rolldown cannot bundle it);
     // point the browser build at the real runtime entry.
     '@vivari/core': fileURLToPath(new URL('../../runtime/vivari/packages/core/dist/index.js', import.meta.url)),
+    '@nexari/runtime-contract': fileURLToPath(new URL('../../packages/runtime-contract/src/index.ts', import.meta.url)),
   } },
   server: { headers: isolation, fs: { allow: [fileURLToPath(new URL('../../runtime/vivari', import.meta.url))] } },
   preview: { headers: isolation },
