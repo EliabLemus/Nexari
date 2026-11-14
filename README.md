@@ -8,6 +8,10 @@ It is not a Linux VM, Docker replacement, native Node runtime, or a copy of Stac
 
 `0.1.0-dev` is the contract-and-provenance milestone. It establishes the target, source policy, and deterministic gates before any host integration or runtime-semantic fork changes.
 
+## Host integration
+
+Verified host requirements and patterns (detached servers, cwd pinning, stale-port kill, plain-HTML fallback): [HOST-INTEGRATION-GUIDE.md](./HOST-INTEGRATION-GUIDE.md).
+
 ## Boundaries
 
 - Bolt.DIY is an analysis input only. This repository does not modify it.
