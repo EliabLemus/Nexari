@@ -2,13 +2,20 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 
 const adapterRoot = fileURLToPath(new URL('..', import.meta.url));
 const repositoryRoot = fileURLToPath(new URL('../../..', import.meta.url));
+
+// Resolve the repo-owned TypeScript compiler: `tsc` is not on PATH inside
+// package subdirectories (and a stray fake `tsc` package would be picked up).
+const rootTsc = path.join(repositoryRoot, 'node_modules', '.bin', 'tsc');
+const tsc = existsSync(rootTsc) ? rootTsc : 'tsc';
 const coreEntrypoint = new URL('../../../runtime/vivari/packages/core/dist/index.js', import.meta.url);
 
 test('the adapter type-checks against the owned Vivari fork declarations', () => {
-  execFileSync('tsc', ['-p', 'tsconfig.linkage.json', '--noEmit'], {
+  execFileSync(tsc, ['-p', 'tsconfig.linkage.json', '--noEmit'], {
     cwd: adapterRoot,
     stdio: 'pipe',
   });

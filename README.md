@@ -6,6 +6,24 @@ Nace como fork mantenido de [Vivari](https://github.com/maitrungduc1410/vivari) 
 
 No es una VM Linux, ni un reemplazo de Docker, ni un runtime Node nativo, ni una copia de StackBlitz WebContainers.
 
+## Cómo encaja todo (Vivari → Nexari → Bolt)
+
+```text
+Vivari  = el motor WebAssembly (proyecto upstream, MIT)
+Nexari  = NUESTRA versión mejorada y mantenida de ese motor — el runtime
+Bolt    = el IDE en el navegador donde el LLM genera; Nexari ejecuta
+```
+
+Nexari **contiene** a Vivari por diseño: es un fork pineado (`runtime/vivari`, submódulo) del que se derivan los paquetes que Bolt consume. No se "extrae" — la trazabilidad de procedencia lo exige.
+
+**Mapa de repos:**
+
+| Repo | Qué es |
+|---|---|
+| **`EliabLemus/Nexari`** (este) | El runtime: contrato, adapter, assets, specs y verificación E2E. La fuente de verdad del motor. |
+| [`EliabLemus/bolt-diy-nexari-runtime`](https://github.com/EliabLemus/bolt-diy-nexari-runtime) | El IDE: Bolt (fork de bolt.diy) con Nexari integrado y los tarballs compilados en `vendor/`. |
+| `EliabLemus/nexari-vivari-provenance-20260922` | Espejo inmutable del punto exacto de Vivari del que partimos (público, para que el submódulo sea clonable por CI y terceros). |
+
 ## Probarlo con Bolt (experiencia completa)
 
 Bolt + Nexari es el IDE en el navegador donde el LLM genera y **ejecuta** proyectos en vivo:
