@@ -26,8 +26,9 @@ jobs:
           cache: npm
       - name: Restore Vivari v1.0.0 tag (provenance check resolves it; mirror carries no tags)
         run: |
+          git -C runtime/vivari fetch --unshallow origin || true
           git -C runtime/vivari fetch --tags --force || true
-          git -C runtime/vivari tag v1.0.0 2629c71097238400c45aefa213ef61df4794c2b7 2>/dev/null || true
+          git -C runtime/vivari tag v1.0.0 2629c71097238400c45aefa213ef61df4794c2b7 2>/dev/null || git -C runtime/vivari tag -f v1.0.0 2629c71097238400c45aefa213ef61df4794c2b7
       - name: Install pinned Rust/wasm toolchain for the Vivari SDK build
         run: |
           rustup toolchain install 1.88.0 --profile minimal --target wasm32-unknown-unknown --target wasm32-wasip1
@@ -62,8 +63,9 @@ jobs:
           cache: npm
       - name: Restore Vivari v1.0.0 tag (provenance check resolves it; mirror carries no tags)
         run: |
+          git -C runtime/vivari fetch --unshallow origin || true
           git -C runtime/vivari fetch --tags --force || true
-          git -C runtime/vivari tag v1.0.0 2629c71097238400c45aefa213ef61df4794c2b7 2>/dev/null || true
+          git -C runtime/vivari tag v1.0.0 2629c71097238400c45aefa213ef61df4794c2b7 2>/dev/null || git -C runtime/vivari tag -f v1.0.0 2629c71097238400c45aefa213ef61df4794c2b7
       - name: Install pinned Rust/wasm toolchain for the Vivari SDK build
         run: |
           rustup toolchain install 1.88.0 --profile minimal --target wasm32-unknown-unknown --target wasm32-wasip1
