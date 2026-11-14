@@ -24,6 +24,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Fetch Vivari submodule tags (provenance checks resolve v1.0.0)
+        run: git -C runtime/vivari fetch --tags --force
       - name: Install pinned Rust/wasm toolchain for the Vivari SDK build
         run: |
           rustup toolchain install 1.88.0 --profile minimal --target wasm32-unknown-unknown --target wasm32-wasip1
@@ -56,6 +58,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Fetch Vivari submodule tags (provenance checks resolve v1.0.0)
+        run: git -C runtime/vivari fetch --tags --force
       - name: Install pinned Rust/wasm toolchain for the Vivari SDK build
         run: |
           rustup toolchain install 1.88.0 --profile minimal --target wasm32-unknown-unknown --target wasm32-wasip1
