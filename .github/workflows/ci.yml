@@ -33,6 +33,10 @@ jobs:
         run: |
           npm ci --prefix runtime/vivari
           npm run build:vivari
+      - name: Build Vivari vendor assets (npm + sqlite)
+        run: |
+          npm run --prefix runtime/vivari vendor:npm
+          npm run --prefix runtime/vivari vendor:sqlite
       - run: npm ci
       - run: npm run typecheck
       - run: npm run generate:compatibility
@@ -61,6 +65,10 @@ jobs:
         run: |
           npm ci --prefix runtime/vivari
           npm run build:vivari
+      - name: Build Vivari vendor assets (npm + sqlite)
+        run: |
+          npm run --prefix runtime/vivari vendor:npm
+          npm run --prefix runtime/vivari vendor:sqlite
       - run: npm ci
       - name: Install browser lab dependencies
         run: npm ci --prefix labs/browser-smoke
