@@ -51,6 +51,8 @@ function serveNexariAssets(): Plugin {
     configurePreviewServer(server) { server.middlewares.use(middleware); },
     closeBundle() {
       const outDir = fileURLToPath(new URL('./dist/', import.meta.url));
+      // vite 8 (rolldown) may invoke closeBundle before the outDir exists.
+      fs.mkdirSync(outDir, { recursive: true });
       fs.copyFileSync(swPath, `${outDir}sw.js`);
       fs.cpSync(assetsDir, `${outDir}assets`, { recursive: true });
       fs.cpSync(vendorDir, `${outDir}vendor`, { recursive: true });
