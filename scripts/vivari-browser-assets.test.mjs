@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -9,11 +9,16 @@ const assetPackage = path.join(repoRoot, 'packages', 'vivari-browser-assets');
 const canonicalPublic = path.join(repoRoot, 'runtime', 'vivari', 'packages', 'studio', 'public');
 const canonicalCoreAssets = path.join(repoRoot, 'runtime', 'vivari', 'packages', 'core', 'dist', 'assets');
 
+// The kernel worker filename carries a content hash that varies between build
+// environments; resolve it dynamically instead of pinning a hash.
+const kernelWorker = (await readdir(canonicalCoreAssets)).find((name) => /^kernel-worker-.*\.js$/.test(name));
+assert.ok(kernelWorker, 'canonical core assets must contain the kernel worker bundle');
+
 const required = [
   ['sw.js', path.join(canonicalCoreAssets, 'sw.js')],
   ['__vv-bridge.html', path.join(canonicalPublic, '__vv-bridge.html')],
   ['__vv-preview-boot.html', path.join(canonicalPublic, '__vv-preview-boot.html')],
-  ['assets/kernel-worker-JoVB2LPb.js', path.join(canonicalCoreAssets, 'kernel-worker-JoVB2LPb.js')],
+  [`assets/${kernelWorker}`, path.join(canonicalCoreAssets, kernelWorker)],
   ['vendor/npm-pack.bin', path.join(canonicalPublic, 'vendor', 'npm-pack.bin')],
   ['vendor/sqlite/sqlite3.wasm', path.join(canonicalPublic, 'vendor', 'sqlite', 'sqlite3.wasm')],
 ];
