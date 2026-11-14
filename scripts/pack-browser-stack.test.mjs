@@ -20,7 +20,9 @@ test('browser stack manifest ships the verified static asset tarball with integr
   assert.ok(assets, 'browser stack must include the static asset package');
   assert.match(assets.sha256, /^[a-f0-9]{64}$/);
   assert.match(assets.files['dist/sw.js'], /^[a-f0-9]{64}$/);
-  assert.match(assets.files['dist/assets/kernel-worker-JoVB2LPb.js'], /^[a-f0-9]{64}$/);
+  const workerKey = Object.keys(assets.files).find((key) => /^dist\/assets\/kernel-worker-.*\.js$/.test(key));
+  assert.ok(workerKey, 'asset payload must include the kernel worker bundle');
+  assert.match(assets.files[workerKey], /^[a-f0-9]{64}$/);
   assert.match(assets.files['dist/vendor/npm-pack.bin'], /^[a-f0-9]{64}$/);
   assert.match(assets.files['dist/__vv-bridge.html'], /^[a-f0-9]{64}$/);
 });
