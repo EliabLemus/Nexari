@@ -87,6 +87,8 @@ jobs:
       - name: Browser E2E (owned loopback-only Chrome, fresh ephemeral profile)
         run: npm run test:browser-lab
         env:
+          NEXARI_CHROME_BIN: /usr/bin/google-chrome-stable
+        env:
           NEXARI_CHROME_BIN: /usr/bin/google-chrome
 
   runtime-toolchain-readiness:
