@@ -53,10 +53,10 @@ cd Nexari
 
 # 1. Compilar el SDK de Vivari (genera runtime/vivari/packages/core/dist)
 npm ci --prefix runtime/vivari
-npm run build:vivari
+pnpm run build:vivari
 
 # 2. Instalar y correr el smoke lab (sirve con COOP/COEP + service worker)
-npm ci
+pnpm install
 cd labs/browser-smoke && npm install && npm run dev
 # → http://127.0.0.1:5173 — verás el runtime bootear, el proceso correr
 #   y el preview responder
@@ -83,9 +83,9 @@ Requisitos y patrones verificados E2E para hosts (servers detached, pin de cwd, 
 ## Local gates
 
 ```text
-npm run generate:compatibility
-npm test
-npm run build
+pnpm run generate:compatibility
+pnpm test
+pnpm run build
 git diff --check
 ```
 

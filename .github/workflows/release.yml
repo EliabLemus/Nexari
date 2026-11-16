@@ -23,10 +23,13 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
+      - uses: pnpm/action-setup@fe02b34f5f605dccca3d94a97e8b97fa44784eb7 # v4.0.0
+        with:
+          version: 9.14.4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
       - name: Install pinned Rust/wasm toolchain for the Vivari SDK build
         run: |
           rustup toolchain install 1.88.0 --profile minimal --target wasm32-unknown-unknown --target wasm32-wasip1
@@ -35,16 +38,16 @@ jobs:
       - name: Build the pinned Vivari SDK
         run: |
           npm ci --prefix runtime/vivari
-          npm run build:vivari
-      - run: npm ci
+          pnpm run build:vivari
+      - run: pnpm install --frozen-lockfile
       - env:
           RELEASE_VERSION: ${{ inputs.version }}
-        run: npm run check:release -- "$RELEASE_VERSION"
-      - run: npm run typecheck
-      - run: npm run generate:compatibility
+        run: pnpm run check:release -- "$RELEASE_VERSION"
+      - run: pnpm run typecheck
+      - run: pnpm run generate:compatibility
       - run: git diff --exit-code -- compatibility
-      - run: npm test
-      - run: npm run build
+      - run: pnpm test
+      - run: pnpm run build
       - run: git diff --check
 
   release:

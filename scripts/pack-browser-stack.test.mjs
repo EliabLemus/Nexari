@@ -11,7 +11,7 @@ const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const manifestPath = path.join(repoRoot, 'artifacts', 'browser-stack', 'manifest.json');
 
 test('browser stack manifest ships the verified static asset tarball with integrity metadata', async () => {
-  await run('npm', ['run', 'build:browser-assets'], { cwd: repoRoot });
+  await run('pnpm', ['run', 'build:browser-assets'], { cwd: repoRoot });
   await run('node', ['scripts/pack-browser-stack.mjs'], { cwd: repoRoot, maxBuffer: 10 * 1024 * 1024 });
 
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));

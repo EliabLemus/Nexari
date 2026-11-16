@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const FORBIDDEN_NPM_PUBLICATION = /(?:npm|pnpm|yarn)\s+publish|npm\s+token|registry-url\s*:|NODE_AUTH_TOKEN\s*:/i;
-const BROWSER_E2E_RUN = /run:.*npm run test:browser-lab/;
+const BROWSER_E2E_RUN = /run:.*(?:npm|pnpm) run test:browser-lab/;
 // The pin must sit in the same workflow step as the browser E2E run, be an
 // absolute path, and actually name a Chrome binary — a bare `google-chrome`
 // or an unrelated absolute binary does not pin a Chrome for the owned runner.

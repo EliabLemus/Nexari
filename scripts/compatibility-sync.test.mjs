@@ -16,7 +16,7 @@ test('generate:compatibility output stays in sync with the curated compatibility
   const { stdout: before } = await run('git', ['diff', '--no-ext-diff', '--binary', '--', 'compatibility'], { cwd: repoRoot });
   let npmRun;
   try {
-    npmRun = await run('npm', ['run', '--silent', 'generate:compatibility'], { cwd: repoRoot });
+    npmRun = await run('pnpm', ['run', '--silent', 'generate:compatibility'], { cwd: repoRoot });
   } catch (error) {
     npmRun = { stdout: error.stdout ?? '', stderr: error.stderr ?? String(error) };
   }
