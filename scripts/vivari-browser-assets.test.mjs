@@ -20,6 +20,7 @@ const required = [
   ['__vv-preview-boot.html', path.join(canonicalPublic, '__vv-preview-boot.html')],
   [`assets/${kernelWorker}`, path.join(canonicalCoreAssets, kernelWorker)],
   ['vendor/npm-pack.bin', path.join(canonicalPublic, 'vendor', 'npm-pack.bin')],
+  ['vendor/pnpm-pack.bin', path.join(canonicalPublic, 'vendor', 'pnpm-pack.bin')],
   ['vendor/sqlite/sqlite3.wasm', path.join(canonicalPublic, 'vendor', 'sqlite', 'sqlite3.wasm')],
 ];
 

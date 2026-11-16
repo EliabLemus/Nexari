@@ -6,6 +6,17 @@ Nace como fork mantenido de [Vivari](https://github.com/maitrungduc1410/vivari) 
 
 No es una VM Linux, ni un reemplazo de Docker, ni un runtime Node nativo, ni una copia de StackBlitz WebContainers.
 
+## Qué aporta Nexari
+
+El motor wasm es la base; Nexari es lo que hace que proyectos **reales** (npm/Vite generados por un LLM) funcionen de punta a punta en el navegador:
+
+- **Pipeline de arranque wasm-safe** — reescritura determinística de `npm install && npm run dev` a una secuencia verificada (lockfile consistente, `esbuild-wasm`, `@rollup/wasm-node`): los postinstalls que exigen binarios nativos dejan de romper el guest `wasm32`.
+- **Bridge de preview** — detección del server in-VM y evento `server-ready (port, url)` para que el host conecte el iframe del preview. El dev server corre *y se ve*.
+- **Bundle de assets verificado** — `@nexari/vivari-browser-assets`: tarball inmutable con SHA-256 por archivo y manifest. Un host limpio bootea el runtime completo (Service Worker, chunks, bridges, vendor) sin symlinks al repo productor; un asset faltante o alterado falla antes del boot.
+- **Contrato tipado fail-closed** — `@nexari/runtime-contract`: los backends se seleccionan explícitamente y los consumidores fallan con errores tipados, nunca con fallbacks silenciosos.
+- **Gates E2E deterministas** — smoke en browser real, verificación de procedencia por SHA-256 y checks locales reproducibles (`npm test`, `npm run test:browser-lab`).
+- **Generación wasm-compatible** — el código que el LLM produce lleva overrides npm wasm-safe por construcción, reduciendo la carga del pipeline de runtime.
+
 ## Cómo encaja todo (Vivari → Nexari → Bolt)
 
 ```text
@@ -63,6 +74,28 @@ cd labs/browser-smoke && npm install && npm run dev
 ```
 
 También existe el runner E2E automatizado (`e2e/browser-smoke.e2e.mjs`), que requiere un Chrome aislado vía `NEXARI_CHROME_CDP_URL` (solo `http://127.0.0.1`).
+
+### Qué verás en el lab (verificado 2026-11-16)
+
+El boot del runtime wasm tarda ~30–60 s: la página muestra `Booting…` y luego pasa a `Ready`. Estado final esperado:
+
+```text
+Ready: in-VM HTTP server on 3111
+
+> nexari-spawn-proof
+> node npm-spawn-proof.js nexari-npm-argument
+NEXARI_NPM_PROOF={"cwd":"/","option":"nexari-npm-option","args":["nexari-npm-argument"]}
+ready
+server-ready /preview/3111/
+```
+
+Y el iframe de preview renderiza **Nexari runtime preview OK**. Eso demuestra, sin Bolt, el runtime **Nexari** (fork mejorado y mantenido de Vivari): el kernel bootea en tu navegador, el guest ejecuta procesos Node (`spawn` con `cwd` pineado a `/`), levanta un servidor HTTP dentro de la VM y el preview lo sirve en vivo. Los botones `Teardown runtime` / `Reboot runtime` permiten destruir y reiniciar el runtime sin recargar la página.
+
+Prueba automatizada equivalente (no necesita navegador abierto a mano):
+
+```bash
+npm run test:browser-lab   # → "browser lab E2E: PASS"
+```
 
 ## Status
 
