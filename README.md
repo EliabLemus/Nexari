@@ -10,12 +10,12 @@ No es una VM Linux, ni un reemplazo de Docker, ni un runtime Node nativo, ni una
 
 El motor wasm es la base; Nexari es lo que hace que proyectos **reales** (npm/Vite generados por un LLM) funcionen de punta a punta en el navegador:
 
-- **Pipeline de arranque wasm-safe** — reescritura determinística de `npm install && npm run dev` a una secuencia verificada (lockfile consistente, `esbuild-wasm`, `@rollup/wasm-node`): los postinstalls que exigen binarios nativos dejan de romper el guest `wasm32`.
+- **Pipeline de arranque wasm-safe** — la reescritura determinística de `npm install && npm run dev` a una secuencia wasm-safe (lockfile consistente, `esbuild-wasm`, `@rollup/wasm-node`) es responsabilidad del **host de integración (Bolt)**; Nexari recibe la secuencia ya verificada y monta/spawnea vía el SDK.
 - **Bridge de preview** — detección del server in-VM y evento `server-ready (port, url)` para que el host conecte el iframe del preview. El dev server corre *y se ve*.
-- **Bundle de assets verificado** — `@nexari/vivari-browser-assets`: tarball inmutable con SHA-256 por archivo y manifest. Un host limpio bootea el runtime completo (Service Worker, chunks, bridges, vendor) sin symlinks al repo productor; un asset faltante o alterado falla antes del boot.
+- **Bundle de assets verificado** — `@nexari/vivari-browser-assets`: tarball inmutable con SHA-256 por archivo y manifest (el manifest vive en `artifacts/browser-stack/manifest.json`). Los hashes son **metadata de empaquetado del bundle**: la verificación es responsabilidad del host de integración — el runtime no tiene gate de boot por hash. Un host limpio bootea el runtime completo (Service Worker, chunks, bridges, vendor) sin symlinks al repo productor.
 - **Contrato tipado fail-closed** — `@nexari/runtime-contract`: los backends se seleccionan explícitamente y los consumidores fallan con errores tipados, nunca con fallbacks silenciosos.
 - **Gates E2E deterministas** — smoke en browser real, verificación de procedencia por SHA-256 y checks locales reproducibles (`npm test`, `npm run test:browser-lab`).
-- **Generación wasm-compatible** — el código que el LLM produce lleva overrides npm wasm-safe por construcción, reduciendo la carga del pipeline de runtime.
+- **Generación wasm-compatible** — atribuida al **host de integración (Bolt)**: el código que el LLM produce llega con overrides npm wasm-safe por construcción; Nexari lo ejecuta, no lo genera.
 
 ## Cómo encaja todo (Vivari → Nexari → Bolt)
 

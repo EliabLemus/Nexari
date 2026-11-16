@@ -36,6 +36,11 @@ jobs:
         run: |
           npm ci --prefix runtime/vivari
           pnpm run build:vivari
+      - name: Build Vivari vendor assets (npm + sqlite + pnpm)
+        run: |
+          npm run --prefix runtime/vivari vendor:npm
+          npm run --prefix runtime/vivari vendor:sqlite
+          npm run --prefix runtime/vivari vendor:pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
       - run: pnpm run generate:compatibility

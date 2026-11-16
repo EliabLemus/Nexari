@@ -42,7 +42,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - env:
           RELEASE_VERSION: ${{ inputs.version }}
-        run: pnpm run check:release -- "$RELEASE_VERSION"
+        run: pnpm run check:release "$RELEASE_VERSION"
       - run: pnpm run typecheck
       - run: pnpm run generate:compatibility
       - run: git diff --exit-code -- compatibility

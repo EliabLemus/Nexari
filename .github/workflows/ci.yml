@@ -45,6 +45,7 @@ jobs:
         run: |
           npm run --prefix runtime/vivari vendor:npm
           npm run --prefix runtime/vivari vendor:sqlite
+          npm run --prefix runtime/vivari vendor:pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
       - run: pnpm run generate:compatibility
@@ -85,6 +86,7 @@ jobs:
         run: |
           npm run --prefix runtime/vivari vendor:npm
           npm run --prefix runtime/vivari vendor:sqlite
+          npm run --prefix runtime/vivari vendor:pnpm
       - run: pnpm install --frozen-lockfile
       - name: Install browser lab dependencies
         run: npm ci --prefix labs/browser-smoke
